@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+
+  :root {
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  input, textarea, select {
+    user-select: auto;
+  }
+}
+
+/* Custom scrollbar for clean mobile touch feel */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Safe area insets padding for mobile devices */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 16px);
+}

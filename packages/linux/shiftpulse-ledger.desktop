@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ShiftPulse Ledger Pro
+GenericName=Payroll & Bookkeeping System
+Comment=B2B Knjigovodstvo, Smenski Rad i ePorezi PPP-PD Obračun
+Exec=bash -c "cd $(dirname %k) && ./start-linux.sh"
+Icon=shiftpulse-ledger
+Terminal=true
+Categories=Office;Finance;Business;Utility;
+Keywords=payroll;accounting;shifts;ledger;eporezi;srbija;
+StartupNotify=true

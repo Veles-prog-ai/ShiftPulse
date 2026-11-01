@@ -1,0 +1,8 @@
+{
+  "name": "ShiftPulse Ledger Pro",
+  "description": "Desktop bookkeeping & payroll software: official RS tax & contributions payroll engine, ePorezi PPP-PD XML generation, printable payslips, and shift registry.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

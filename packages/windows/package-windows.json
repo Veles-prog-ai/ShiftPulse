@@ -1,0 +1,32 @@
+{
+  "name": "shiftpulse-ledger-pro-win",
+  "productName": "ShiftPulse Ledger Pro (Windows)",
+  "version": "1.0.0",
+  "platform": "win32",
+  "architecture": ["x64", "arm64"],
+  "target": "nsis",
+  "description": "ShiftPulse Ledger Pro - Windows Desktop Installation Package for Live Testing",
+  "author": "ShiftPulse Team",
+  "license": "Commercial / Proprietary",
+  "main": "main.js",
+  "scripts": {
+    "start": "start-windows.bat",
+    "install:pkg": "install-windows.bat",
+    "test:live": "powershell -ExecutionPolicy Bypass -File run-windows.ps1"
+  },
+  "build": {
+    "appId": "com.shiftpulse.ledgerpro.win",
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "public/icon.svg",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ShiftPulse Ledger Pro"
+    }
+  }
+}

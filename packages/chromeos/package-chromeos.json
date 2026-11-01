@@ -1,0 +1,21 @@
+{
+  "name": "shiftpulse-ledger-pro-chromeos",
+  "productName": "ShiftPulse Ledger Pro (ChromeOS)",
+  "version": "1.0.0",
+  "platform": "chromeos",
+  "description": "ShiftPulse Ledger Pro - ChromeOS & Chromebook Native PWA & Linux Container Package",
+  "author": "ShiftPulse Team",
+  "license": "Commercial / Proprietary",
+  "type": "pwa+crostini",
+  "manifest": "manifest.chromeos.json",
+  "scripts": {
+    "start": "bash install-chromeos.sh",
+    "launch:pwa": "xdg-open chromeos-pwa-launcher.html"
+  },
+  "chromeos": {
+    "shelfIcon": "public/icon.svg",
+    "display": "standalone",
+    "windowControlsOverlay": true,
+    "crostiniSupport": true
+  }
+}

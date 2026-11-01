@@ -1,0 +1,50 @@
+{
+  "id": "com.shiftpulse.ledgerpro.chromeos",
+  "name": "ShiftPulse Ledger Pro - ChromeOS Enterprise",
+  "short_name": "ShiftPulse",
+  "description": "B2B Bookkeeping, Shift Management & ePorezi PPP-PD for ChromeOS & Chromebooks",
+  "start_url": "/?platform=chromeos",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0284c7",
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Obračun Zarada (Ledger)",
+      "short_name": "Zarade",
+      "url": "/?tab=ledger",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Kalendar i Smene",
+      "short_name": "Kalendar",
+      "url": "/?tab=calendar-shifts",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Dosijei Klijenata",
+      "short_name": "Klijenti",
+      "url": "/?tab=clients",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

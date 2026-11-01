@@ -1,0 +1,63 @@
+{
+  "id": "app.shiftpulse.twa",
+  "name": "ShiftPulse - Shift Work Calendar & Multi-Job Payroll",
+  "short_name": "ShiftPulse",
+  "description": "Mobile shift work calendar with routine and irregular break tracking, overtime calculation, night differentials, and multi-job payroll management.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "window-controls-overlay"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["productivity", "business", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Shift",
+      "short_name": "Add Shift",
+      "description": "Quickly log a new work shift",
+      "url": "/?action=add-shift",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Calendar Roster",
+      "short_name": "Calendar",
+      "description": "View monthly and weekly shift roster",
+      "url": "/?tab=calendar",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Payroll Summary",
+      "short_name": "Payroll",
+      "description": "Calculate multi-job gross and overtime pay",
+      "url": "/?tab=payroll",
+      "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
+    }
+  ],
+  "share_target": {
+    "action": "/?action=share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
+}

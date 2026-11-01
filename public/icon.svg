@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5" />
+      <stop offset="50%" stop-color="#3730a3" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="sunGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+    <linearGradient id="moonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rectangle for Android adaptive squircle/maskable compatibility -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Orbit Track representing 24h Shift Rotation -->
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#6366f1" stroke-width="12" stroke-dasharray="8 8" opacity="0.4" />
+
+  <!-- Left Half Day Shift Arc -->
+  <path d="M 256,96 A 160,160 0 0,1 256,416" fill="none" stroke="url(#sunGrad)" stroke-width="20" stroke-linecap="round" filter="url(#shadow)" />
+
+  <!-- Right Half Night Shift Arc -->
+  <path d="M 256,416 A 160,160 0 0,1 256,96" fill="none" stroke="url(#moonGrad)" stroke-width="20" stroke-linecap="round" opacity="0.85" />
+
+  <!-- Center Dial -->
+  <circle cx="256" cy="256" r="92" fill="#1e1b4b" stroke="#4338ca" stroke-width="8" filter="url(#shadow)" />
+
+  <!-- Clock Hands -->
+  <!-- Hour hand pointing to 07:00 (Day shift transition) -->
+  <line x1="256" y1="256" x2="190" y2="300" stroke="#ffffff" stroke-width="12" stroke-linecap="round" />
+  <!-- Minute hand pointing to 12:00 -->
+  <line x1="256" y1="256" x2="256" y2="185" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" />
+  <!-- Center Pin -->
+  <circle cx="256" cy="256" r="14" fill="#fbbf24" stroke="#ffffff" stroke-width="4" />
+
+  <!-- Day Shift Sun Accent Icon Top Left -->
+  <circle cx="140" cy="150" r="18" fill="url(#sunGrad)" filter="url(#shadow)" />
+
+  <!-- Night Shift Crescent Moon Accent Icon Bottom Right -->
+  <path d="M 370,350 A 22,22 0 0,1 352,328 A 22,22 0 0,0 376,370 A 22,22 0 0,1 370,350 Z" fill="#38bdf8" filter="url(#shadow)" />
+</svg>

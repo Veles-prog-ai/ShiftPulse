@@ -1,0 +1,25 @@
+{
+  "name": "shiftpulse-ledger-pro-linux",
+  "productName": "ShiftPulse Ledger Pro (Linux)",
+  "version": "1.0.0",
+  "platform": "linux",
+  "architecture": ["x64", "arm64"],
+  "target": ["AppImage", "deb", "tar.gz"],
+  "description": "ShiftPulse Ledger Pro - Linux Desktop Installation Package for Live Testing",
+  "author": "ShiftPulse Team",
+  "license": "Commercial / Proprietary",
+  "main": "main.js",
+  "scripts": {
+    "start": "bash start-linux.sh",
+    "install:pkg": "bash install-linux.sh"
+  },
+  "build": {
+    "appId": "com.shiftpulse.ledgerpro.linux",
+    "linux": {
+      "target": ["AppImage", "deb", "tar.gz"],
+      "icon": "public/icon.svg",
+      "category": "Office",
+      "synopsis": "B2B Payroll, Bookkeeping and Shift Work Platform"
+    }
+  }
+}
