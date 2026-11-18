@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useShift } from "../context/ShiftContext";
 import { useLanguage, interpolate } from "../i18n/LanguageContext";
+import { PluginActionButtons } from "../plugins/PluginContext";
+import { pluginManager } from "../plugins/PluginManager";
 import {
   analyzeUploadedDocument,
   parseRawDocumentText,
@@ -400,6 +402,13 @@ export const FinancialProfitTaxView = () => {
   };
 
   const handleExportCsv = async () => {
+    await pluginManager.runBeforeReportExportHooks({
+      reportType: "profit-tax-csv",
+      activeCompany,
+      period,
+      recordCount: filteredRecords.length,
+      summary,
+    });
     const csv = exportFinancialLedgerCsv(activeCompany, filteredRecords, summary);
     const filename = `Profit_Loss_Statement_${activeCompany?.pib || "client"}_${period}.csv`;
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -531,6 +540,11 @@ export const FinancialProfitTaxView = () => {
               <Send className="w-4 h-4" />
               <span>{p.sendBtn}</span>
             </button>
+
+            <PluginActionButtons
+              slot="profit-tax-toolbar"
+              context={{ activeCompany, filteredRecords, summary, period }}
+            />
           </div>
         </div>
 

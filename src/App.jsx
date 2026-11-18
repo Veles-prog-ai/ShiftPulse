@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ShiftProvider, useShift } from "./context/ShiftContext";
+import { PluginProvider, PluginSidebarWidgets, PluginCustomRouteView } from "./plugins/PluginContext";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext";
 import { Header } from "./components/Header";
 import { BottomTabBar } from "./components/BottomTabBar";
@@ -41,6 +42,10 @@ const AppContent = () => {
   };
 
   const renderActiveView = () => {
+    if (typeof currentTab === "string" && currentTab.startsWith("plugin:")) {
+      const routePath = currentTab.slice("plugin:".length);
+      return <PluginCustomRouteView routePath={routePath} />;
+    }
     switch (currentTab) {
       case "profit-tax":
         return <FinancialProfitTaxView />;
@@ -73,7 +78,10 @@ const AppContent = () => {
       >
         <Header />
         <main className="flex-1 px-3.5 sm:px-6 py-5 pb-24 overflow-x-hidden flex flex-col justify-between">
-          <div>{renderActiveView()}</div>
+          <div>
+            <PluginSidebarWidgets />
+            {renderActiveView()}
+          </div>
 
           {/* Legal & Compliance Footer */}
           <footer className="mt-12 pt-6 border-t border-slate-200 dark:border-slate-800/80 text-xs text-slate-500 dark:text-slate-400">
@@ -160,7 +168,9 @@ export default function App() {
   return (
     <LanguageProvider>
       <ShiftProvider>
-        <AppContent />
+        <PluginProvider>
+          <AppContent />
+        </PluginProvider>
       </ShiftProvider>
     </LanguageProvider>
   );

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { INITIAL_JOBS, INITIAL_SHIFTS } from "../data/mockData";
 import { calculateSerbianWorkerPayroll } from "../utils/payrollCalculator";
+import { pluginManager } from "../plugins/PluginManager";
 import {
   WORKSPACE_ROOT_NAME,
   restoreSavedWorkspaceHandle,
@@ -1256,23 +1257,26 @@ export const ShiftProvider = ({ children }) => {
     setProfessionalEvents((prev) => prev.filter((ev) => ev.id !== id));
   };
   const addFinancialRecord = (recordData) => {
-    const newRec = {
+    const draftRec = {
       ...recordData,
       id: recordData.id || `fin-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       companyId: recordData.companyId || activeCompany?.id || "firma-1",
       createdAt: recordData.createdAt || new Date().toISOString(),
     };
+    const newRec = pluginManager.runLedgerEntryCreateHooks(draftRec);
     setFinancialRecords((prev) => [newRec, ...prev]);
     return newRec;
   };
   const addFinancialRecordsBatch = (recordsList = []) => {
     const nowIso = new Date().toISOString();
-    const prepared = recordsList.map((r, idx) => ({
-      ...r,
-      id: r.id || `fin-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
-      companyId: r.companyId || activeCompany?.id || "firma-1",
-      createdAt: nowIso,
-    }));
+    const prepared = recordsList.map((r, idx) =>
+      pluginManager.runLedgerEntryCreateHooks({
+        ...r,
+        id: r.id || `fin-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`,
+        companyId: r.companyId || activeCompany?.id || "firma-1",
+        createdAt: nowIso,
+      }),
+    );
     setFinancialRecords((prev) => [...prepared, ...prev]);
     return prepared;
   };

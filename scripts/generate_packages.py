@@ -18,10 +18,13 @@ PUBLIC_DOWNLOADS = os.path.join(ROOT_DIR, 'public', 'downloads')
 PACKAGES_DIR = os.path.join(ROOT_DIR, 'packages')
 DIST_DIR = os.path.join(ROOT_DIR, 'dist')
 
+SERVER_MODULES_DIR = os.path.join(ROOT_DIR, 'server')
+PLUGINS_DIR = os.path.join(ROOT_DIR, 'plugins')
+
 os.makedirs(PUBLIC_DOWNLOADS, exist_ok=True)
 
-# 1. Osiguraj da je dist/ uvek sveže izgrađen
-print("[*] Generišem svež produkcioni build (npm run build)...")
+# 1. Ensure dist/ is freshly built
+print("[*] Building production bundle (npm run build)...")
 subprocess.run(["npm", "run", "build"], cwd=ROOT_DIR, check=True)
 
 COMMON_CORE_FILES = [
@@ -52,7 +55,7 @@ def add_dir_to_tar(tar_handle, dir_path, arc_prefix):
 
 def build_windows_package():
     target_zip = os.path.join(PUBLIC_DOWNLOADS, 'shiftpulse-windows-package.zip')
-    print(f"[*] Pravim Windows instalacioni paket sa kompletnim dist/ bundle-om: {target_zip}")
+    print(f"[*] Building Windows installer package: {target_zip}")
     with zipfile.ZipFile(target_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         win_dir = os.path.join(PACKAGES_DIR, 'windows')
         for item in os.listdir(win_dir):
@@ -61,18 +64,18 @@ def build_windows_package():
             full = os.path.join(ROOT_DIR, cf)
             if os.path.exists(full):
                 zf.write(full, cf)
-        # Dodavanje ikona i manifesta
         for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'install.html', 'landing.html', 'admin.html']:
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 zf.write(p, f'public/{asset}')
-        # Dodavanje celog pre-built dist direktorijuma za instant offline rad bez kompajliranja
+        add_dir_to_zip(zf, SERVER_MODULES_DIR, 'server')
+        add_dir_to_zip(zf, PLUGINS_DIR, 'plugins')
         add_dir_to_zip(zf, DIST_DIR, 'dist')
-    print(f"[OK] Windows paket kreiran ({os.path.getsize(target_zip)} bajtova)")
+    print(f"[OK] Windows package created ({os.path.getsize(target_zip)} bytes)")
 
 def build_linux_package():
     target_tar = os.path.join(PUBLIC_DOWNLOADS, 'shiftpulse-linux-package.tar.gz')
-    print(f"[*] Pravim Linux instalacioni paket sa kompletnim dist/ bundle-om: {target_tar}")
+    print(f"[*] Building Linux installer package: {target_tar}")
     with tarfile.open(target_tar, 'w:gz') as tf:
         linux_dir = os.path.join(PACKAGES_DIR, 'linux')
         for item in os.listdir(linux_dir):
@@ -85,13 +88,14 @@ def build_linux_package():
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 tf.add(p, arcname=f'public/{asset}')
-        # Dodavanje celog pre-built dist direktorijuma
+        add_dir_to_tar(tf, SERVER_MODULES_DIR, 'server')
+        add_dir_to_tar(tf, PLUGINS_DIR, 'plugins')
         add_dir_to_tar(tf, DIST_DIR, 'dist')
-    print(f"[OK] Linux paket kreiran ({os.path.getsize(target_tar)} bajtova)")
+    print(f"[OK] Linux package created ({os.path.getsize(target_tar)} bytes)")
 
 def build_chromeos_package():
     target_zip = os.path.join(PUBLIC_DOWNLOADS, 'shiftpulse-chromeos-package.zip')
-    print(f"[*] Pravim ChromeOS instalacioni paket sa kompletnim dist/ bundle-om: {target_zip}")
+    print(f"[*] Building ChromeOS installer package: {target_zip}")
     with zipfile.ZipFile(target_zip, 'w', zipfile.ZIP_DEFLATED) as zf:
         cos_dir = os.path.join(PACKAGES_DIR, 'chromeos')
         for item in os.listdir(cos_dir):
@@ -104,9 +108,10 @@ def build_chromeos_package():
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 zf.write(p, f'public/{asset}')
-        # Dodavanje celog pre-built dist direktorijuma
+        add_dir_to_zip(zf, SERVER_MODULES_DIR, 'server')
+        add_dir_to_zip(zf, PLUGINS_DIR, 'plugins')
         add_dir_to_zip(zf, DIST_DIR, 'dist')
-    print(f"[OK] ChromeOS paket kreiran ({os.path.getsize(target_zip)} bajtova)")
+    print(f"[OK] ChromeOS package created ({os.path.getsize(target_zip)} bytes)")
 
 if __name__ == '__main__':
     target = sys.argv[1] if len(sys.argv) > 1 else 'all'

@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "license:generate": "node generator.js",
+    "license:generate": "node tools/license-generator.js",
     "electron:package": "electron-builder",
     "package:win": "python3 scripts/generate_packages.py windows",
     "package:linux": "python3 scripts/generate_packages.py linux",
@@ -19,7 +19,7 @@
     "package:all": "python3 scripts/generate_packages.py all"
   },
   "dependencies": {
-    "@google/genai": "^2.4.0",
+    "@google/genai": "^2.31.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
@@ -50,13 +50,15 @@
     "productName": "ShiftPulse Ledger Pro",
     "files": [
       "dist/**/*",
+      "server/**/*",
+      "plugins/**/*",
       "server.js",
+      "legalMonitorEngine.js",
       "package.json",
       "main.js"
     ],
     "files_exclude": [
-      "generator.ts",
-      "generator.js",
+      "tools/**/*",
       ".env.local"
     ],
     "win": {

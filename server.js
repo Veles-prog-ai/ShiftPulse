@@ -6,29 +6,45 @@ import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import { Client } from "pg";
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { createLegalMonitorService } from "./legalMonitorEngine.js";
+import {
+  analyzeDocumentWithGemini,
+  detectShiftConflictsWithGemini,
+  isGeminiConfigured,
+  sendGeminiErrorResponse,
+} from "./server/geminiService.js";
+import { BackendPluginManager } from "./server/PluginManager.js";
+
 dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
-const PORT = Number(process.env.PORT) || 3e3;
+const PORT = Number(process.env.PORT) || 3000;
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+// ========================================================
+// B2B LICENSE ENCRYPTION, RSA VERIFICATION & ANTI-TAMPER CLOCK
+// ========================================================
 const MASTER_ENCRYPTION_KEY =
   process.env.LEDGER_MASTER_SECRET ||
   "359b8c642f883f3e8f85f1c2b5e913a47d2b8e3a5f6c8d7b1a2c3d4e5f6a7b8c";
-const ALGORITAM = "aes-256-cbc";
-function generisiB2BLicencu(podaci) {
-  const tekstZaEnkripciju = JSON.stringify(podaci);
+const ENCRYPTION_ALGORITHM = "aes-256-cbc";
+
+function generateB2BLicense(payloadData) {
+  const plaintext = JSON.stringify(payloadData);
   const iv = crypto.randomBytes(16);
-  const kljucBafer = crypto.scryptSync(MASTER_ENCRYPTION_KEY, "salt", 32);
-  const cipher = crypto.createCipheriv(ALGORITAM, kljucBafer, iv);
-  let kriptovanTekst = cipher.update(tekstZaEnkripciju, "utf8", "hex");
-  kriptovanTekst += cipher.final("hex");
-  return `${iv.toString("hex")}:${kriptovanTekst}`;
+  const keyBuffer = crypto.scryptSync(MASTER_ENCRYPTION_KEY, "salt", 32);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, keyBuffer, iv);
+  let encryptedText = cipher.update(plaintext, "utf8", "hex");
+  encryptedText += cipher.final("hex");
+  return `${iv.toString("hex")}:${encryptedText}`;
 }
-const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+
+const RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtoy/gpIB/szHA4ECbPPq
 ArviUKRLy9fqhpwPqp5iE2R2xDag+31DPSK12JVxc73YAdS+KC652IdZiFFnC4De
 9DrIW/svEwoVvzu75rk9+m2ZFFSiRIw1JvUMZouPwND0327yGks0m9r/Uu9UIlLm
@@ -37,18 +53,17 @@ ArviUKRLy9fqhpwPqp5iE2R2xDag+31DPSK12JVxc73YAdS+KC652IdZiFFnC4De
 vt6sSiWt+dG6RCmcgObnoM3Cj45MMU9PpGESPaAZzYwREJPOU1GSnEsXLxUPOxgj
 PwIDAQAB
 -----END PUBLIC KEY-----`;
+
 export function validatePromoLicense(licenseKeyBase64) {
   try {
     const buffer = Buffer.from(licenseKeyBase64.trim(), "base64");
-    const decrypted = crypto.publicDecrypt(PUBLIC_KEY, buffer);
+    const decrypted = crypto.publicDecrypt(RSA_PUBLIC_KEY, buffer);
     const payload = JSON.parse(decrypted.toString("utf-8"));
     if (!payload.expiresAt) {
-      return { isValid: false, reason: "Nevalidan format licence." };
+      return { isValid: false, reason: "Invalid license payload format." };
     }
-    const currentDate = /* @__PURE__ */ new Date();
-    const expirationDate = /* @__PURE__ */ new Date(
-      payload.expiresAt + "T23:59:59",
-    );
+    const currentDate = new Date();
+    const expirationDate = new Date(`${payload.expiresAt}T23:59:59`);
     if (currentDate > expirationDate) {
       return {
         isValid: false,
@@ -56,26 +71,30 @@ export function validatePromoLicense(licenseKeyBase64) {
       };
     }
     return { isValid: true, payload };
-  } catch (error) {
+  } catch {
     return {
       isValid: false,
-      reason:
-        "Critical error: License signature is invalid or corrupted.",
+      reason: "Critical error: License signature is invalid or corrupted.",
     };
   }
 }
+
 const SYS_METADATA_FILE = path.join(__dirname, "sys_metadata.json");
+
 function getLocalStoredTime() {
   try {
     if (fs.existsSync(SYS_METADATA_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(SYS_METADATA_FILE, "utf-8"));
       if (parsed.last_timestamp) return new Date(parsed.last_timestamp);
     }
-  } catch (e) {}
-  const now = /* @__PURE__ */ new Date();
+  } catch {
+    // Fallback to current timestamp when metadata file is unreadable
+  }
+  const now = new Date();
   setLocalStoredTime(now);
   return now;
 }
+
 function setLocalStoredTime(time) {
   try {
     fs.writeFileSync(
@@ -87,9 +106,13 @@ function setLocalStoredTime(time) {
       ),
       "utf-8",
     );
-  } catch (e) {}
+  } catch {
+    // Ignore write failures in read-only mount contexts
+  }
 }
+
 getLocalStoredTime();
+
 let globalPgClient = null;
 if (process.env.DATABASE_URL) {
   try {
@@ -98,11 +121,11 @@ if (process.env.DATABASE_URL) {
       .connect()
       .then(async () => {
         await globalPgClient.query(`
-        CREATE TABLE IF NOT EXISTS sys_metadata (
-          key VARCHAR(50) PRIMARY KEY,
-          last_timestamp TIMESTAMP NOT NULL
-        );
-      `);
+          CREATE TABLE IF NOT EXISTS sys_metadata (
+            key VARCHAR(50) PRIMARY KEY,
+            last_timestamp TIMESTAMP NOT NULL
+          );
+        `);
         const res = await globalPgClient.query(
           "SELECT last_timestamp FROM sys_metadata WHERE key = 'last_run_time'",
         );
@@ -115,13 +138,14 @@ if (process.env.DATABASE_URL) {
       .catch(() => {
         globalPgClient = null;
       });
-  } catch (e) {
+  } catch {
     globalPgClient = null;
   }
 }
+
 export async function verifySystemTimeIntegrity(dbClient) {
   try {
-    const currentSystemTime = /* @__PURE__ */ new Date();
+    const currentSystemTime = new Date();
     const activeClient = dbClient || globalPgClient;
     if (activeClient) {
       const res = await activeClient.query(
@@ -140,7 +164,7 @@ export async function verifySystemTimeIntegrity(dbClient) {
         return {
           isTimeValid: false,
           reason:
-            "Sistemska gre\u0161ka: Detektovana manipulacija vremenom na ra\u010Dunaru. Pristup aplikaciji je zaklju\u010Dan.",
+            "System integrity alert: Clock rollback detected on workstation. Access locked.",
           lastRecorded: lastRecordedTime,
         };
       }
@@ -150,37 +174,38 @@ export async function verifySystemTimeIntegrity(dbClient) {
       );
       setLocalStoredTime(currentSystemTime);
       return { isTimeValid: true, lastRecorded: currentSystemTime };
-    } else {
-      const lastRecordedTime = getLocalStoredTime();
-      if (currentSystemTime.getTime() < lastRecordedTime.getTime() - 6e4) {
-        return {
-          isTimeValid: false,
-          reason:
-            "Sistemska gre\u0161ka: Detektovana manipulacija vremenom na ra\u010Dunaru. Pristup aplikaciji je zaklju\u010Dan.",
-          lastRecorded: lastRecordedTime,
-        };
-      }
-      if (currentSystemTime.getTime() > lastRecordedTime.getTime()) {
-        setLocalStoredTime(currentSystemTime);
-      }
-      return { isTimeValid: true, lastRecorded: currentSystemTime };
     }
-  } catch (error) {
+
+    const lastRecordedTime = getLocalStoredTime();
+    if (currentSystemTime.getTime() < lastRecordedTime.getTime() - 60000) {
+      return {
+        isTimeValid: false,
+        reason:
+          "System integrity alert: Clock rollback detected on workstation. Access locked.",
+        lastRecorded: lastRecordedTime,
+      };
+    }
+    if (currentSystemTime.getTime() > lastRecordedTime.getTime()) {
+      setLocalStoredTime(currentSystemTime);
+    }
+    return { isTimeValid: true, lastRecorded: currentSystemTime };
+  } catch {
     return {
       isTimeValid: false,
-      reason: "Gre\u0161ka pri proveri integriteta sistema.",
+      reason: "Error verifying system clock integrity.",
     };
   }
 }
-function validirajLokalnuLicencu(kljucLicence) {
-  if (!kljucLicence) {
+
+function validateLocalLicense(licenseKey) {
+  if (!licenseKey) {
     return {
       validna: false,
       podaci: null,
-      razlog: "Format licencnog klju\u010Da nije ispravan.",
+      razlog: "License key is missing or improperly formatted.",
     };
   }
-  const cleaned = kljucLicence.trim();
+  const cleaned = licenseKey.trim();
   if (!cleaned.includes(":") && cleaned.length > 80) {
     const rsaCheck = validatePromoLicense(cleaned);
     if (rsaCheck.isValid && rsaCheck.payload) {
@@ -197,10 +222,10 @@ function validirajLokalnuLicencu(kljucLicence) {
           features: rsaCheck.payload.features,
         },
       };
-    } else {
-      return { validna: false, podaci: null, razlog: rsaCheck.reason };
     }
+    return { validna: false, podaci: null, razlog: rsaCheck.reason };
   }
+
   if (!cleaned.includes(":")) {
     return {
       validna: false,
@@ -208,43 +233,42 @@ function validirajLokalnuLicencu(kljucLicence) {
       razlog: "Invalid license key format.",
     };
   }
+
   try {
-    const [ivHex, kriptovanTekst] = cleaned.split(":");
+    const [ivHex, encryptedHex] = cleaned.split(":");
     const iv = Buffer.from(ivHex, "hex");
-    const kljucBafer = crypto.scryptSync(MASTER_ENCRYPTION_KEY, "salt", 32);
-    const decipher = crypto.createDecipheriv(ALGORITAM, kljucBafer, iv);
-    let dešifrovanTekst = decipher.update(kriptovanTekst, "hex", "utf8");
-    dešifrovanTekst += decipher.final("utf8");
-    const podaci = JSON.parse(dešifrovanTekst);
-    const danas = /* @__PURE__ */ new Date();
-    const datumIsteka = /* @__PURE__ */ new Date(
-      podaci.datumIsteka + "T23:59:59",
-    );
-    if (danas > datumIsteka) {
+    const keyBuffer = crypto.scryptSync(MASTER_ENCRYPTION_KEY, "salt", 32);
+    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, keyBuffer, iv);
+    let decryptedText = decipher.update(encryptedHex, "hex", "utf8");
+    decryptedText += decipher.final("utf8");
+    const licenseData = JSON.parse(decryptedText);
+    const today = new Date();
+    const expirationDate = new Date(`${licenseData.datumIsteka}T23:59:59`);
+    if (today > expirationDate) {
       return {
         validna: false,
-        podaci,
-        razlog: `Licenca je istekla dana ${podaci.datumIsteka}.`,
+        podaci: licenseData,
+        razlog: `License expired on ${licenseData.datumIsteka}.`,
       };
     }
-    return { validna: true, podaci };
-  } catch (err) {
+    return { validna: true, podaci: licenseData };
+  } catch {
     return {
       validna: false,
       podaci: null,
-      razlog:
-        "Kriptografski potpis neispravan. Klju\u010D je modifikovan ili hakovan!",
+      razlog: "Cryptographic signature mismatch. License key may be corrupted or tampered.",
     };
   }
 }
-let AKTIVNI_KLIJENTSKI_KLJUC = process.env.B2B_LICENSE_KEY || "";
+
+let activeClientLicenseKey = process.env.B2B_LICENSE_KEY || "";
 const ISSUED_LICENSES_AUDIT_FILE = path.join(__dirname, "issued_licenses_audit.jsonl");
 
 function appendIssuedLicenseAudit(entry) {
   try {
     fs.appendFileSync(ISSUED_LICENSES_AUDIT_FILE, JSON.stringify(entry) + "\n", "utf8");
-  } catch (e) {
-    console.warn("License audit log warning:", e.message);
+  } catch (error) {
+    console.warn("[License] Audit log write warning:", error.message);
   }
 }
 
@@ -258,9 +282,9 @@ function readIssuedLicenseAudit(limit = 30) {
     return lines
       .slice(-limit)
       .reverse()
-      .map((l) => {
+      .map((line) => {
         try {
-          return JSON.parse(l);
+          return JSON.parse(line);
         } catch {
           return null;
         }
@@ -271,63 +295,17 @@ function readIssuedLicenseAudit(limit = 30) {
   }
 }
 
-app.post("/api/license/admin-generate", (req, res) => {
-  try {
-    const { pibAgencije, nazivAgencije, maksimalnoRadnika, datumIsteka } =
-      req.body;
-    if (!pibAgencije || !nazivAgencije || !datumIsteka) {
-      res
-        .status(400)
-        .json({ error: "Nedostaju obavezni parametri za izradu licence." });
-      return;
-    }
-    const noviKljuc = generisiB2BLicencu({
-      pibAgencije: String(pibAgencije),
-      nazivAgencije: String(nazivAgencije),
-      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
-      datumIsteka: String(datumIsteka),
-      // Format: YYYY-MM-DD
-    });
-    const keyFingerprint = crypto
-      .createHash("sha256")
-      .update(noviKljuc)
-      .digest("hex")
-      .slice(0, 12);
-    appendIssuedLicenseAudit({
-      issuedAt: new Date().toISOString(),
-      pibAgencije: String(pibAgencije),
-      nazivAgencije: String(nazivAgencije),
-      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
-      datumIsteka: String(datumIsteka),
-      keyFingerprint,
-    });
-    res.json({
-      success: true,
-      kljucZaKlijenta: noviKljuc,
-      kljujcZaKlijenta: noviKljuc,
-      keyFingerprint,
-      napomena:
-        "Kopirajte ovaj klju\u010D i po\u0161aljite ga knjigovodstvenoj agenciji da ga unese u svoj sistem.",
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({
-        error: "Gre\u0161ka na master generatoru licenci.",
-        details: error.message,
-      });
-  }
-});
-app.get("/api/license/status", async (req, res) => {
+async function resolveLicenseStatusSnapshot(customKeyOverride = "") {
   const timeCheck = await verifySystemTimeIntegrity();
-  const customKey = req.headers["x-license-key"] || req.query.key;
-  const kljucZaProveru =
-    customKey || AKTIVNI_KLIJENTSKI_KLJUC || process.env.B2B_LICENSE_KEY;
+  const keyToCheck =
+    customKeyOverride || activeClientLicenseKey || process.env.B2B_LICENSE_KEY;
+
   if (!timeCheck.isTimeValid) {
-    res.json({
+    return {
       success: false,
       valid: false,
       trial: false,
+      tier: "Locked",
       antiClockTampering: {
         isTimeValid: false,
         reason: timeCheck.reason,
@@ -336,14 +314,15 @@ app.get("/api/license/status", async (req, res) => {
       licenciraniPravniSubjekat: "SYSTEM LOCKED",
       datumIsteka: "BLOCKED",
       poruka: timeCheck.reason,
-    });
-    return;
+    };
   }
-  if (!kljucZaProveru) {
-    res.json({
+
+  if (!keyToCheck) {
+    return {
       success: false,
       valid: false,
       trial: true,
+      tier: "Trial",
       antiClockTampering: {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
@@ -353,23 +332,23 @@ app.get("/api/license/status", async (req, res) => {
       maksimalnoRadnika: 3,
       poruka:
         "Workstation running in unlicensed trial mode (up to 3 workers). ePorezi XML export requires an active commercial license.",
-    });
-    return;
+    };
   }
-  const provera = validirajLokalnuLicencu(kljucZaProveru);
-  if (provera.validna && provera.podaci) {
-    res.json({
+
+  const check = validateLocalLicense(keyToCheck);
+  if (check.validna && check.podaci) {
+    return {
       success: true,
       valid: true,
       trial: false,
-      licenseId: provera.podaci.licenseId,
-      licenciraniPravniSubjekat: provera.podaci.nazivAgencije,
-      pibAgencije: provera.podaci.pibAgencije,
-      tier: provera.podaci.tier || "Enterprise / Full Content",
-      issuedAt: provera.podaci.issuedAt,
-      datumIsteka: provera.podaci.datumIsteka,
-      maksimalnoRadnika: provera.podaci.maksimalnoRadnika,
-      features: provera.podaci.features || [
+      licenseId: check.podaci.licenseId,
+      licenciraniPravniSubjekat: check.podaci.nazivAgencije,
+      pibAgencije: check.podaci.pibAgencije,
+      tier: check.podaci.tier || "Enterprise / Full Content",
+      issuedAt: check.podaci.issuedAt,
+      datumIsteka: check.podaci.datumIsteka,
+      maksimalnoRadnika: check.podaci.maksimalnoRadnika,
+      features: check.podaci.features || [
         "ai_scanner",
         "conflict_monitor",
         "b2b_shift_management",
@@ -379,80 +358,143 @@ app.get("/api/license/status", async (req, res) => {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      poruka: `Station authorized and licensed (${provera.podaci.tier || "Enterprise"}).`,
-    });
-  } else {
-    res.json({
-      success: false,
-      valid: false,
-      trial: true,
-      antiClockTampering: {
-        isTimeValid: true,
-        lastRecorded: timeCheck.lastRecorded,
-      },
-      licenciraniPravniSubjekat: "Unlicensed Workstation",
-      datumIsteka: "EXPIRED",
-      poruka:
-        provera.razlog || "License key is missing, invalid, or expired.",
-    });
+      poruka: `Station authorized and licensed (${check.podaci.tier || "Enterprise"}).`,
+    };
   }
+
+  return {
+    success: false,
+    valid: false,
+    trial: true,
+    tier: "Trial",
+    antiClockTampering: {
+      isTimeValid: true,
+      lastRecorded: timeCheck.lastRecorded,
+    },
+    licenciraniPravniSubjekat: "Unlicensed Workstation",
+    datumIsteka: "EXPIRED",
+    poruka: check.razlog || "License key is missing, invalid, or expired.",
+  };
+}
+
+// ========================================================
+// MODULAR PLUGIN MANAGER (BACKEND)
+// ========================================================
+const pluginManager = new BackendPluginManager({
+  pluginsDir: path.join(__dirname, "plugins"),
+  sysMetadataPath: SYS_METADATA_FILE,
+  resolveLicenseStatus: resolveLicenseStatusSnapshot,
 });
-app.post("/api/license/activate", (req, res) => {
+
+app.post("/api/license/admin-generate", (req, res) => {
   try {
-    const { kljucLicence } = req.body;
-    if (!kljucLicence) {
-      res
-        .status(400)
-        .json({ success: false, error: "Nedostaje licencni klju\u010D." });
+    const { pibAgencije, nazivAgencije, maksimalnoRadnika, datumIsteka, tier } =
+      req.body || {};
+    if (!pibAgencije || !nazivAgencije || !datumIsteka) {
+      res.status(400).json({
+        error: "Missing required fields for license generation (PIB, company name, expiration date).",
+      });
       return;
     }
-    const provera = validirajLokalnuLicencu(kljucLicence);
-    if (!provera.validna) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: provera.razlog || "Licenca nije validna.",
-        });
-      return;
-    }
-    AKTIVNI_KLIJENTSKI_KLJUC = kljucLicence.trim();
+    const generatedKey = generateB2BLicense({
+      pibAgencije: String(pibAgencije),
+      nazivAgencije: String(nazivAgencije),
+      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
+      datumIsteka: String(datumIsteka),
+      tier: tier ? String(tier) : "Enterprise",
+    });
+    const keyFingerprint = crypto
+      .createHash("sha256")
+      .update(generatedKey)
+      .digest("hex")
+      .slice(0, 12);
+
+    appendIssuedLicenseAudit({
+      issuedAt: new Date().toISOString(),
+      pibAgencije: String(pibAgencije),
+      nazivAgencije: String(nazivAgencije),
+      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
+      datumIsteka: String(datumIsteka),
+      tier: tier ? String(tier) : "Enterprise",
+      keyFingerprint,
+    });
+
     res.json({
       success: true,
-      message:
-        "Licenca je uspe\u0161no autorizovana i aktivirana na ovoj stanici!",
-      licenca: provera.podaci,
+      kljucZaKlijenta: generatedKey,
+      licenseKey: generatedKey,
+      keyFingerprint,
+      napomena:
+        "Copy this key and provide it to the accounting firm for workstation activation.",
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: "Gre\u0161ka pri aktivaciji licence.",
-        details: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to generate B2B license key.",
+      details: error.message,
+    });
   }
 });
-app.post("/api/license/verify", (req, res) => {
-  const { kljucLicence } = req.body;
-  const provera = validirajLokalnuLicencu(kljucLicence);
-  res.json(provera);
+
+app.get("/api/license/status", async (req, res) => {
+  const customKey = String(req.headers["x-license-key"] || req.query.key || "");
+  const snapshot = await resolveLicenseStatusSnapshot(customKey);
+  res.json(snapshot);
 });
-const štitLicence = async (req, res, next) => {
+
+app.post("/api/license/activate", async (req, res) => {
+  try {
+    const { kljucLicence } = req.body || {};
+    if (!kljucLicence) {
+      res.status(400).json({ success: false, error: "License key is required." });
+      return;
+    }
+    const validation = validateLocalLicense(kljucLicence);
+    if (!validation.validna) {
+      res.status(400).json({
+        success: false,
+        error: validation.razlog || "License key is invalid.",
+      });
+      return;
+    }
+    activeClientLicenseKey = kljucLicence.trim();
+    await pluginManager.initialize(activeClientLicenseKey);
+    res.json({
+      success: true,
+      message: "License successfully verified and activated on this workstation.",
+      licenca: validation.podaci,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Error activating workstation license.",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/api/license/verify", (req, res) => {
+  const { kljucLicence } = req.body || {};
+  const validation = validateLocalLicense(kljucLicence);
+  res.json(validation);
+});
+
+const licenseGuardMiddleware = async (req, res, next) => {
   const timeCheck = await verifySystemTimeIntegrity();
   if (!timeCheck.isTimeValid) {
     res.status(403).json({
       error:
         timeCheck.reason ||
-        "Pristup odbijen: Detektovana manipulacija sistemskim satom.",
+        "Access denied: System clock tampering detected.",
       antiClockTampering: true,
     });
     return;
   }
+
   const customKey = req.headers["x-license-key"] || req.query.key;
-  const klijentskiKljuc =
-    customKey || AKTIVNI_KLIJENTSKI_KLJUC || process.env.B2B_LICENSE_KEY;
-  if (!klijentskiKljuc) {
+  const clientKey =
+    customKey || activeClientLicenseKey || process.env.B2B_LICENSE_KEY;
+
+  if (!clientKey) {
     if (
       req.path === "/api/ledger/calculate-payroll" &&
       (req.body.radnici?.length > 3 || req.body.workerCount > 3)
@@ -475,19 +517,21 @@ const štitLicence = async (req, res, next) => {
     next();
     return;
   }
-  const provera = validirajLokalnuLicencu(klijentskiKljuc);
-  if (!provera.validna) {
+
+  const validation = validateLocalLicense(String(clientKey));
+  if (!validation.validna) {
     res.status(403).json({
       error:
         "Access denied: Commercial license for this workstation is inactive or expired.",
-      detalji: provera.razlog,
+      details: validation.razlog,
     });
     return;
   }
+
   if (
-    provera.podaci?.features &&
+    validation.podaci?.features &&
     req.path === "/api/ledger/generate-xml" &&
-    !provera.podaci.features.includes("eporezi_xml")
+    !validation.podaci.features.includes("eporezi_xml")
   ) {
     res.status(403).json({
       error: "Your active license tier does not include the ePorezi XML export module.",
@@ -495,9 +539,14 @@ const štitLicence = async (req, res, next) => {
     });
     return;
   }
+
   next();
 };
-app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
+
+// ========================================================
+// STATUTORY PAYROLL & PPP-PD XML ENDPOINTS
+// ========================================================
+app.post("/api/ledger/calculate-payroll", licenseGuardMiddleware, (req, res) => {
   try {
     const {
       grossSalary,
@@ -510,10 +559,10 @@ app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
       nightHours,
       holidayHours,
       overtimeHours,
-    } = req.body;
+    } = req.body || {};
 
-    const base = Number(grossSalary || brutoBaza) || 95000;
-    const hourlyRate = Number(satnica) || Math.round(base / 176);
+    const baseSalary = Number(grossSalary || brutoBaza) || 95000;
+    const hourlyRate = Number(satnica) || Math.round(baseSalary / 176);
 
     const regHours = Number(regularHours) || 0;
     const vacHours = Number(vacationHours) || 0;
@@ -523,7 +572,6 @@ app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
     const holHours = Number(holidayHours) || 0;
     const otHours = Number(overtimeHours) || 0;
 
-    // Ako su poslati sati, računamo po satima, inače koristimo osnovicu
     let regularPay = 0;
     let vacationPay = 0;
     let sickPay65 = 0;
@@ -531,18 +579,18 @@ app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
 
     if (regHours > 0 || vacHours > 0 || sick65 > 0 || sick100 > 0) {
       regularPay = regHours * hourlyRate;
-      vacationPay = vacHours * hourlyRate * 1.0; // 100%
-      sickPay65 = sick65 * hourlyRate * 0.65; // 65%
-      sickPay100 = sick100 * hourlyRate * 1.0; // 100%
+      vacationPay = vacHours * hourlyRate * 1.0;
+      sickPay65 = sick65 * hourlyRate * 0.65;
+      sickPay100 = sick100 * hourlyRate * 1.0;
     } else {
-      regularPay = base;
+      regularPay = baseSalary;
     }
 
     const bonusNight = nightH * hourlyRate * 0.26;
     const bonusHoliday = holHours * hourlyRate * 1.1;
     const bonusOvertime = otHours * hourlyRate * 0.26;
 
-    const ukupnaBrutoOsnovica =
+    const totalGrossBase =
       regularPay +
       vacationPay +
       sickPay65 +
@@ -551,30 +599,31 @@ app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
       bonusHoliday +
       bonusOvertime;
 
-    const neoporezivo = 25000;
-    const poreskaBaza = Math.max(0, ukupnaBrutoOsnovica - neoporezivo);
-    const porez = poreskaBaza * 0.10;
-    const pioRadnik = ukupnaBrutoOsnovica * 0.14;
-    const zdravstvoRadnik = ukupnaBrutoOsnovica * 0.0515;
-    const nezaposlenostRadnik = ukupnaBrutoOsnovica * 0.0075;
-    const doprinosiRadnik = pioRadnik + zdravstvoRadnik + nezaposlenostRadnik;
-    const neto = ukupnaBrutoOsnovica - porez - doprinosiRadnik;
+    const nonTaxableDeduction = 25000;
+    const taxableBase = Math.max(0, totalGrossBase - nonTaxableDeduction);
+    const incomeTax = taxableBase * 0.10;
+    const pioEmployee = totalGrossBase * 0.14;
+    const healthEmployee = totalGrossBase * 0.0515;
+    const unemploymentEmployee = totalGrossBase * 0.0075;
+    const totalEmployeeContributions =
+      pioEmployee + healthEmployee + unemploymentEmployee;
+    const netSalary = totalGrossBase - incomeTax - totalEmployeeContributions;
 
-    const pioFirma = ukupnaBrutoOsnovica * 0.10;
-    const zdravstvoFirma = ukupnaBrutoOsnovica * 0.0515;
-    const doprinosiFirma = pioFirma + zdravstvoFirma;
-    const brutoII = ukupnaBrutoOsnovica + doprinosiFirma;
+    const pioEmployer = totalGrossBase * 0.10;
+    const healthEmployer = totalGrossBase * 0.0515;
+    const totalEmployerContributions = pioEmployer + healthEmployer;
+    const totalGrossII = totalGrossBase + totalEmployerContributions;
 
     res.json({
       success: true,
       obracun: {
-        ukupnaBrutoOsnovica: Math.round(ukupnaBrutoOsnovica * 100) / 100,
-        bruto: Math.round(ukupnaBrutoOsnovica * 100) / 100,
-        neto: Math.round(neto * 100) / 100,
-        porez: Math.round(porez * 100) / 100,
-        doprinosiRadnik: Math.round(doprinosiRadnik * 100) / 100,
-        doprinosiFirma: Math.round(doprinosiFirma * 100) / 100,
-        ukupnoZaIsplatuFirme: Math.round(brutoII * 100) / 100,
+        ukupnaBrutoOsnovica: Math.round(totalGrossBase * 100) / 100,
+        bruto: Math.round(totalGrossBase * 100) / 100,
+        neto: Math.round(netSalary * 100) / 100,
+        porez: Math.round(incomeTax * 100) / 100,
+        doprinosiRadnik: Math.round(totalEmployeeContributions * 100) / 100,
+        doprinosiFirma: Math.round(totalEmployerContributions * 100) / 100,
+        ukupnoZaIsplatuFirme: Math.round(totalGrossII * 100) / 100,
         naknade: {
           redovanRad: Math.round(regularPay * 100) / 100,
           godisnjiOdmor: Math.round(vacationPay * 100) / 100,
@@ -591,14 +640,15 @@ app.post("/api/ledger/calculate-payroll", štitLicence, (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      error: "Greška pri obračunu zarada.",
+      error: "Failed to calculate payroll.",
       details: error.message,
     });
   }
 });
-app.post("/api/ledger/generate-xml", štitLicence, (req, res) => {
+
+app.post("/api/ledger/generate-xml", licenseGuardMiddleware, (req, res) => {
   try {
-    const { pibIsplatioca, obracunskiPeriod, stavke } = req.body;
+    const { pibIsplatioca, obracunskiPeriod, stavke } = req.body || {};
     const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <PodaciPoreskeDeklaracije xmlns="http://pid.purs.gov.rs">
   <Zaglavlje>
@@ -611,65 +661,52 @@ app.post("/api/ledger/generate-xml", štitLicence, (req, res) => {
     res.setHeader("Content-Type", "application/xml");
     res.send(xmlContent);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        error: "Gre\u0161ka pri generisanju XML deklaracije.",
-        details: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to generate XML tax declaration.",
+      details: error.message,
+    });
   }
 });
-let interniRegistarOglasa = [];
-app.get("/api/posredovanje/oglasi", (req, res) => {
-  res.json({ success: true, oglasi: interniRegistarOglasa });
+
+// ========================================================
+// INTERNAL PLACEMENT & STAFFING REGISTRY
+// ========================================================
+let internalPlacementsRegistry = [];
+
+app.get("/api/posredovanje/oglasi", (_req, res) => {
+  res.json({ success: true, oglasi: internalPlacementsRegistry });
 });
+
 app.post("/api/posredovanje/kreiraj", (req, res) => {
-  const oglasLog = {
+  const entry = {
     ...req.body,
     id: `oglas-log-${Date.now()}`,
-    createdAt: /* @__PURE__ */ new Date().toISOString(),
+    createdAt: new Date().toISOString(),
   };
-  interniRegistarOglasa.unshift(oglasLog);
-  res.json({ success: true, oglas: oglasLog });
+  internalPlacementsRegistry.unshift(entry);
+  res.json({ success: true, oglas: entry });
 });
+
 app.patch("/api/posredovanje/status/:id", (req, res) => {
   const { id } = req.params;
-  const { status, interneBeleskeAgencije } = req.body;
-  interniRegistarOglasa = interniRegistarOglasa.map((o) =>
-    o.id === id
+  const { status, interneBeleskeAgencije } = req.body || {};
+  internalPlacementsRegistry = internalPlacementsRegistry.map((item) =>
+    item.id === id
       ? {
-          ...o,
-          status: status ?? o.status,
+          ...item,
+          status: status ?? item.status,
           interneBeleskeAgencije:
-            interneBeleskeAgencije ?? o.interneBeleskeAgencije,
+            interneBeleskeAgencije ?? item.interneBeleskeAgencije,
         }
-      : o,
+      : item,
   );
-  res.json({ success: true, message: "Dosije oglasa a\u017Euriran." });
+  res.json({ success: true, message: "Placement record updated." });
 });
+
 // ========================================================
-// OPTIMIZED SERVER-SIDE GEMINI AI & ZERO-PII HITL TELEMETRY
+// SERVER-SIDE GEMINI AI & ZERO-PII HITL TELEMETRY
 // ========================================================
 const HITL_AUDIT_LOG_FILE = path.join(__dirname, "hitl_approval_audit.jsonl");
-
-function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: { headers: { "User-Agent": "aistudio-build" } },
-  });
-}
-
-function handleGeminiError(res, err, fallbackMsg) {
-  const status = err?.status || err?.code || 500;
-  const httpStatus = status === 429 ? 429 : status >= 400 && status < 500 ? status : 502;
-  res.status(httpStatus).json({
-    success: false,
-    error: fallbackMsg,
-    details: err?.message || "Nepoznata greška AI gateway-a.",
-  });
-}
 
 function persistSanitizedHitlLog(rawBody = {}) {
   const allowedDecisions = ["approved", "edited_approved", "rejected"];
@@ -679,17 +716,17 @@ function persistSanitizedHitlLog(rawBody = {}) {
       ? "rejected"
       : "approved";
 
-  // ZERO-KNOWLEDGE: Prikupljamo ISKLJUČIVO nalog/ulogu i status odobrenja AI odgovora.
-  // Nikakvi finansijski podaci, PIB, plate, imena klijenata ili tekstovi ugovora se NE ČUVAJU.
+  // Zero-knowledge telemetry: stores ONLY operator account metadata and approval status.
+  // No client invoices, tax IDs, salaries, or contract contents are persisted on the server.
   const sanitizedEntry = {
     logId: `hitl-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
     timestamp: new Date().toISOString(),
     licenseId: String(rawBody.licenseId || "STATION-LOCAL").slice(0, 64),
     accountId: String(rawBody.accountId || "op-owner-1").slice(0, 64),
     accountUsername: String(
-      rawBody.accountUsername || rawBody.operaterIme || "lokalni_operater",
+      rawBody.accountUsername || rawBody.operaterIme || "local_operator",
     ).slice(0, 64),
-    accountRole: String(rawBody.accountRole || "Ovlašćeni Operater").slice(0, 64),
+    accountRole: String(rawBody.accountRole || "Authorized Operator").slice(0, 64),
     module: String(rawBody.module || "ai_copilot").slice(0, 64),
     decision: normalizedDecision,
     aiModel: String(rawBody.aiModel || "gemini-4-hydrogen").slice(0, 64),
@@ -704,186 +741,67 @@ function persistSanitizedHitlLog(rawBody = {}) {
 
 app.post("/api/legal/analyze-document", async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
-      return res.status(503).json({
-        success: false,
-        code: "GEMINI_KEY_MISSING",
-        error:
-          "GEMINI_API_KEY nije podešen na serveru. Koristite lokalni deterministički analitičar dokumenata (0 tokena).",
-      });
-    }
-
     const { base64Data, mimeType, extractedTextSnippet } = req.body || {};
     if (!base64Data && !extractedTextSnippet) {
       return res.status(400).json({
         success: false,
-        error: "Nedostaje dokument ili tekst za AI analizu.",
+        error: "Missing document file or text snippet for AI analysis.",
       });
     }
 
-    const parts = [];
-    if (extractedTextSnippet) {
-      parts.push({
-        text: `Analiziraj radni ugovor / platni list (RS Zakon o radu):\n${String(extractedTextSnippet).slice(0, 8000)}`,
-      });
-    } else {
-      parts.push({
-        inlineData: {
-          data: String(base64Data),
-          mimeType: mimeType || "application/pdf",
-        },
-      });
-      parts.push({
-        text: "Izvuci poslodavca, ulogu, satnicu, prekovremeni/noćni rad i proveri odstupanja od Zakona o radu RS.",
-      });
-    }
-
-    const response = await ai.models.generateContent({
-      model: "gemini-4-hydrogen",
-      contents: parts,
-      config: {
-        systemInstruction:
-          "Ti si precizan pravno-obračunski ekstraktor za RS Zakon o radu. Izvuci tražena polja sažeto u JSON formatu; ako podatak nedostaje stavi 0 ili 'Nepoznato'. U legalComplianceAlerts navedi samo konkretna zakonska upozorenja (maks 3 kratke stavke).",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            contractAnalysis: {
-              type: Type.OBJECT,
-              properties: {
-                employerName: { type: Type.STRING },
-                detectedRole: { type: Type.STRING },
-                baseHourlyRate: { type: Type.NUMBER },
-                currency: { type: Type.STRING },
-              },
-              required: ["employerName", "detectedRole", "baseHourlyRate", "currency"],
-            },
-            extractedRules: {
-              type: Type.OBJECT,
-              properties: {
-                dailyOvertimeThreshold: { type: Type.NUMBER },
-                overtimeMultiplier: { type: Type.NUMBER },
-                nightDiffEnabled: { type: Type.BOOLEAN },
-                nightShiftWindow: {
-                  type: Type.OBJECT,
-                  properties: {
-                    start: { type: Type.STRING },
-                    end: { type: Type.STRING },
-                  },
-                  required: ["start", "end"],
-                },
-                nightDiffValue: { type: Type.NUMBER },
-              },
-              required: [
-                "dailyOvertimeThreshold",
-                "overtimeMultiplier",
-                "nightDiffEnabled",
-                "nightShiftWindow",
-                "nightDiffValue",
-              ],
-            },
-            legalComplianceAlerts: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-            },
-          },
-          required: ["contractAnalysis", "extractedRules", "legalComplianceAlerts"],
-        },
-      },
+    const analysisResult = await analyzeDocumentWithGemini({
+      base64Data,
+      mimeType,
+      extractedTextSnippet,
     });
-
-    const parsed = JSON.parse(response.text || "{}");
-    const usage = response.usageMetadata || {};
 
     res.json({
       success: true,
-      ...parsed,
-      aiMeta: {
-        model: "gemini-4-hydrogen",
-        thinkingLevel: "LOW",
-        executionSource: "gemini_api",
-        promptTokens: usage.promptTokenCount || 0,
-        outputTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0,
-      },
+      ...analysisResult,
     });
   } catch (error) {
-    console.error("Gemini document analysis error:", error);
-    handleGeminiError(res, error, "Greška tokom server-side Gemini analize dokumenta.");
+    if (error.code === "GEMINI_KEY_MISSING") {
+      return res.status(503).json({
+        success: false,
+        code: "GEMINI_KEY_MISSING",
+        error: error.message,
+      });
+    }
+    console.error("[Gemini] Document analysis error:", error);
+    sendGeminiErrorResponse(res, error, "Server-side Gemini document analysis failed.");
   }
 });
 
 app.post("/api/schedule/detect-conflicts", async (req, res) => {
   try {
-    const ai = getGeminiClient();
-    if (!ai) {
-      return res.status(503).json({
-        success: false,
-        code: "GEMINI_KEY_MISSING",
-        error: "GEMINI_API_KEY nije podešen na serveru za kompleksnu analizu poruka.",
-      });
-    }
-
     const { incomingMessage, compactScheduleSummary, existingShifts } = req.body || {};
     if (!incomingMessage) {
       return res.status(400).json({
         success: false,
-        error: "Nedostaje ulazna poruka za proveru konflikta.",
+        error: "Missing incoming shift message for conflict check.",
       });
     }
 
-    // Optimizacija tokena: koristi već sabijeni tekst ili kompajlira maks 15 smena server-side
-    const scheduleStr = compactScheduleSummary
-      ? String(compactScheduleSummary).slice(0, 1500)
-      : Array.isArray(existingShifts)
-        ? existingShifts
-            .slice(0, 15)
-            .map((s) => `${s.date} ${s.startTime}-${s.endTime}`)
-            .join("; ")
-        : "Nema zakazanih smena";
-
-    const response = await ai.models.generateContent({
-      model: "gemini-4-hydrogen",
-      contents: `Raspored: ${scheduleStr || "Prazan"}\nPoruka: ${String(incomingMessage).slice(0, 1200)}`,
-      config: {
-        systemInstruction:
-          "Proveri da li nova poruka sadrži preklapanje smena sa rasporedom. Vrati kratak status i profesionalan nacrt odgovora na srpskom jeziku.",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            conflictDetected: { type: Type.BOOLEAN },
-            detectedDate: { type: Type.STRING },
-            detectedTimeWindow: { type: Type.STRING },
-            conflictDetails: { type: Type.STRING },
-            suggestedReplyTemplate: { type: Type.STRING },
-          },
-          required: ["conflictDetected", "conflictDetails", "suggestedReplyTemplate"],
-        },
-      },
+    const conflictResult = await detectShiftConflictsWithGemini({
+      incomingMessage,
+      compactScheduleSummary,
+      existingShifts,
     });
-
-    const parsed = JSON.parse(response.text || "{}");
-    const usage = response.usageMetadata || {};
 
     res.json({
       success: true,
-      ...parsed,
-      aiMeta: {
-        model: "gemini-4-hydrogen",
-        thinkingLevel: "LOW",
-        executionSource: "gemini_api",
-        promptTokens: usage.promptTokenCount || 0,
-        outputTokens: usage.candidatesTokenCount || 0,
-        totalTokens: usage.totalTokenCount || 0,
-      },
+      ...conflictResult,
     });
   } catch (error) {
-    console.error("Gemini conflict detection error:", error);
-    handleGeminiError(res, error, "Greška tokom Gemini provere konflikta smena.");
+    if (error.code === "GEMINI_KEY_MISSING") {
+      return res.status(503).json({
+        success: false,
+        code: "GEMINI_KEY_MISSING",
+        error: error.message,
+      });
+    }
+    console.error("[Gemini] Conflict detection error:", error);
+    sendGeminiErrorResponse(res, error, "Server-side Gemini shift conflict check failed.");
   }
 });
 
@@ -895,12 +813,12 @@ app.post("/api/hitl/log-approval", (req, res) => {
       privacyGuarantee: "account-and-approval-status-only",
       entry,
       message:
-        "HITL odluka lokalnog naloga je trajno zabeležena na serveru bez ikakvih poslovnih ili ličnih podataka.",
+        "HITL operator decision recorded on the server without personal or financial payloads.",
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      error: "Greška pri upisu HITL telemetrije.",
+      error: "Failed to record HITL audit telemetry.",
       details: error.message,
     });
   }
@@ -943,7 +861,6 @@ app.get("/api/hitl/logs", (_req, res) => {
   }
 });
 
-// Sanitized backward-compatible alias: više NE upisuje PIB ni sadržaj ugovora!
 app.post("/api/legal/log-action", (req, res) => {
   try {
     const entry = persistSanitizedHitlLog(req.body || {});
@@ -951,16 +868,68 @@ app.post("/api/legal/log-action", (req, res) => {
       success: true,
       privacyGuarantee: "account-and-approval-status-only",
       entry,
-      message:
-        "Operacija je autentifikovana od strane lokalnog naloga i zabeležena samo kao status odobrenja.",
+      message: "Action authenticated by local account and logged as status-only audit entry.",
     });
   } catch (error) {
     res.status(500).json({
-      error: "Greška pri upisu u bezbednosni log.",
+      error: "Failed to write audit log.",
       details: error.message,
     });
   }
 });
+
+// ========================================================
+// PLUGIN REGISTRY & ISOLATED HOOK DISPATCHER API
+// ========================================================
+app.get("/api/plugins", async (req, res) => {
+  try {
+    const customKey = String(req.headers["x-license-key"] || req.query.key || "");
+    const snapshot = await pluginManager.initialize(customKey);
+    res.json(snapshot);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to load plugin registry.",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/api/plugins/reload", async (req, res) => {
+  try {
+    const customKey = String(req.headers["x-license-key"] || "");
+    const snapshot = await pluginManager.initialize(customKey);
+    res.json(snapshot);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/plugins/hooks/:hookName", async (req, res) => {
+  const { hookName } = req.params;
+  const payload = req.body || {};
+  try {
+    if (hookName === "onLedgerEntryCreate") {
+      const result = await pluginManager.runLedgerEntryCreateHooks(payload);
+      return res.json({ success: true, payload: result });
+    }
+    if (hookName === "onBeforeReportExport") {
+      const result = await pluginManager.runBeforeReportExportHooks(payload);
+      return res.json({ success: true, payload: result });
+    }
+    await pluginManager.emit(hookName, payload);
+    return res.json({ success: true, payload });
+  } catch (error) {
+    return res.status(200).json({
+      success: false,
+      isolated: true,
+      error: error.message,
+      payload,
+    });
+  }
+});
+
+app.use("/api/plugins/custom", pluginManager.customRouteDispatcher());
 
 // ========================================================
 // COMMERCIAL OS DISTRIBUTION PACKAGES (Windows, Linux, ChromeOS)
@@ -1063,12 +1032,12 @@ app.get("/api/packages/download/:os", (req, res) => {
   } else if (osType === "chromeos" || osType === "cos") {
     filename = "shiftpulse-chromeos-package.zip";
   } else {
-    return res.status(400).json({ error: "Nepoznat operativni sistem." });
+    return res.status(400).json({ error: "Unsupported operating system identifier." });
   }
 
   const filePath = path.join(downloadsDir, filename);
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ error: "Paket još uvek nije generisan." });
+    return res.status(404).json({ error: "Package archive has not been built yet." });
   }
 
   res.download(filePath, filename);
@@ -1120,10 +1089,10 @@ function ensureLocalWorkspaceTree(rootDir = LOCAL_WORKSPACE_ROOT) {
     fs.writeFileSync(
       readmePath,
       [
-        "SHIFTPULSE LEDGER PRO - LOKALNI RADNI PROSTOR",
-        "01_Ulaz_Dokumenta/ -> Ubaci fakture, otpremnice, slipove, izvode za offline skeniranje",
-        "02_Izlaz_Dokumenta/ -> Generisani CSV bilansi, ePorezi XML, virmani i ugovori",
-        "03_Korisnicki_Backup/ -> Enkriptovani AES-256-GCM korisnicki backup fajlovi",
+        "SHIFTPULSE LEDGER PRO - LOCAL WORKSPACE DIRECTORY",
+        "01_Ulaz_Dokumenta/ -> Drop invoices, delivery notes, slips, and statements for offline scanning",
+        "02_Izlaz_Dokumenta/ -> Generated CSV statements, ePorezi XML, payment orders, and contracts",
+        "03_Korisnicki_Backup/ -> Encrypted AES-256-GCM user backup archives",
       ].join("\n"),
       "utf-8",
     );
@@ -1151,8 +1120,8 @@ function ensureLocalWorkspaceTree(rootDir = LOCAL_WORKSPACE_ROOT) {
 if (process.env.SHIFTPULSE_LOCAL_DESKTOP === "1") {
   try {
     ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
-  } catch (e) {
-    console.warn("Workspace init warning:", e.message);
+  } catch (error) {
+    console.warn("[Workspace] Directory initialization warning:", error.message);
   }
 }
 
@@ -1161,7 +1130,7 @@ const requireLocalDesktop = (req, res, next) => {
     return res.status(403).json({
       success: false,
       error:
-        "Zero-Knowledge Gateway politika: Cloud server ne pristupa lokalnim fajlovima. Koristite lokalnu Desktop instalaciju ili Browser Folder Picker.",
+        "Zero-Knowledge Gateway policy: Cloud server does not access local client files. Use the standalone Desktop installer or Browser Folder Picker.",
     });
   }
   next();
@@ -1193,6 +1162,7 @@ app.get("/api/gateway/status", (req, res) => {
       unreadNotifications: lm.telemetry.unreadCount,
       lastCheckAt: lm.telemetry.lastCheckAt,
     },
+    pluginsCount: pluginManager.loadedPlugins.size,
     timestamp: new Date().toISOString(),
   });
 });
@@ -1202,6 +1172,7 @@ app.get("/api/health", (_req, res) => {
     success: true,
     status: "ok",
     port: PORT,
+    nodeEnv: process.env.NODE_ENV || "development",
     uptimeSec: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
   });
@@ -1229,7 +1200,7 @@ app.get("/api/admin/overview", (_req, res) => {
         uptimeSec: Math.round(process.uptime()),
         rssMemoryMb: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
         heapUsedMb: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
-        geminiProxyConfigured: Boolean(process.env.GEMINI_API_KEY),
+        geminiProxyConfigured: isGeminiConfigured(),
         databaseConfigured: Boolean(globalPgClient),
       },
       hitl: {
@@ -1242,15 +1213,16 @@ app.get("/api/admin/overview", (_req, res) => {
         lastCheckAt: lm.telemetry.lastCheckAt,
       },
       issuedLicenses: readIssuedLicenseAudit(25),
+      plugins: pluginManager.getRegistrySnapshot(),
       timestamp: new Date().toISOString(),
     });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // ========================================================
-// AUTOMATED LOW-RESOURCE LEGAL CHANGE MONITOR (SERVER / ADMIN)
+// AUTOMATED LOW-RESOURCE LEGAL CHANGE MONITOR
 // ========================================================
 app.get("/api/legal-monitor/status", (_req, res) => {
   res.json(legalMonitorService.getStatus());
@@ -1260,8 +1232,8 @@ app.post("/api/legal-monitor/check-now", async (_req, res) => {
   try {
     const result = await legalMonitorService.runLightweightHttpChecks();
     res.json(result);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1279,8 +1251,8 @@ app.post("/api/legal-monitor/compare", (req, res) => {
       return res.status(400).json(outcome);
     }
     res.json(outcome);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1294,11 +1266,14 @@ app.post("/api/legal-monitor/notifications/:id/acknowledge", (req, res) => {
       return res.status(404).json(outcome);
     }
     res.json(outcome);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
+// ========================================================
+// LOCAL DESKTOP WORKSPACE FILE SYSTEM API
+// ========================================================
 app.post("/api/workspace/init", requireLocalDesktop, (_req, res) => {
   try {
     const root = ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
@@ -1307,8 +1282,8 @@ app.post("/api/workspace/init", requireLocalDesktop, (_req, res) => {
       workspacePath: root,
       folders: WORKSPACE_FOLDER_STRUCTURE,
     });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1332,7 +1307,11 @@ app.get("/api/workspace/input-files", requireLocalDesktop, (_req, res) => {
             id: `disk-${relFolder}-${entry.name}-${stat.size}`,
             subfolder: relFolder,
             name: entry.name,
-            relativePath: path.posix.join("01_Ulaz_Dokumenta", relFolder === "01_Ulaz_Dokumenta" ? "" : relFolder, entry.name),
+            relativePath: path.posix.join(
+              "01_Ulaz_Dokumenta",
+              relFolder === "01_Ulaz_Dokumenta" ? "" : relFolder,
+              entry.name,
+            ),
             size: stat.size,
             lastModified: stat.mtimeMs,
             source: "local-desktop",
@@ -1342,8 +1321,8 @@ app.get("/api/workspace/input-files", requireLocalDesktop, (_req, res) => {
     };
     walk(inputRoot, "01_Ulaz_Dokumenta");
     res.json({ success: true, workspacePath: root, files });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -1353,42 +1332,57 @@ app.get("/api/workspace/read-input-file", requireLocalDesktop, (req, res) => {
     const inputBase = path.resolve(LOCAL_WORKSPACE_ROOT, "01_Ulaz_Dokumenta");
     const target = path.resolve(LOCAL_WORKSPACE_ROOT, rel);
     if (!target.startsWith(inputBase + path.sep) || !fs.existsSync(target)) {
-      return res.status(404).json({ success: false, error: "Fajl nije pronađen u 01_Ulaz_Dokumenta." });
+      return res.status(404).json({
+        success: false,
+        error: "File not found inside 01_Ulaz_Dokumenta.",
+      });
     }
     res.sendFile(target);
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 app.post("/api/workspace/save-output", requireLocalDesktop, (req, res) => {
   try {
-    const { topFolder = "02_Izlaz_Dokumenta", subFolder = "", filename, content } = req.body || {};
+    const {
+      topFolder = "02_Izlaz_Dokumenta",
+      subFolder = "",
+      filename,
+      content,
+    } = req.body || {};
     if (!filename || typeof content !== "string") {
-      return res.status(400).json({ success: false, error: "Nedostaju naziv fajla ili sadržaj." });
+      return res.status(400).json({
+        success: false,
+        error: "Filename and string content are required.",
+      });
     }
-    const allowedTop = ["02_Izlaz_Dokumenta", "03_Korisnicki_Backup"].includes(topFolder)
+    const allowedTop = ["02_Izlaz_Dokumenta", "03_Korisnicki_Backup"].includes(
+      topFolder,
+    )
       ? topFolder
       : "02_Izlaz_Dokumenta";
     const safeSub = String(subFolder || "").replace(/[^a-zA-Z0-9_-]/g, "");
     const safeFile = path.basename(String(filename)).replace(/[<>:"/\\|?*]/g, "_");
 
     const root = ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
-    const destDir = safeSub ? path.join(root, allowedTop, safeSub) : path.join(root, allowedTop);
+    const destDir = safeSub
+      ? path.join(root, allowedTop, safeSub)
+      : path.join(root, allowedTop);
     fs.mkdirSync(destDir, { recursive: true });
     const fullDest = path.resolve(destDir, safeFile);
     if (!fullDest.startsWith(path.resolve(root) + path.sep)) {
-      return res.status(400).json({ success: false, error: "Neispravna putanja." });
+      return res.status(400).json({ success: false, error: "Invalid destination path." });
     }
     fs.writeFileSync(fullDest, content, "utf-8");
     res.json({ success: true, savedPath: fullDest });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // ========================================================
-// PUBLIC WEBSITE / LANDING, INSTALL & ADMIN CONSOLE ROUTES
+// PUBLIC WEBSITE, INSTALL PORTAL & ADMIN CONSOLE ROUTES
 // ========================================================
 app.get(["/site", "/landing", "/download"], (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "landing.html"));
@@ -1402,13 +1396,37 @@ app.get("/admin", (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "admin.html"));
 });
 
+// Ensure unmatched API routes return structured 404 JSON rather than HTML fallback
+app.all("/api/*", (_req, res) => {
+  res.status(404).json({ success: false, error: "API endpoint not found." });
+});
+
+// ========================================================
+// SERVER BOOTSTRAP (DEV VITE MIDDLEWARE VS. PRODUCTION DIST)
+// ========================================================
 async function startServer() {
-  // Always serve static assets from public/ so manifests, icons and packages are available
+  await pluginManager.initialize();
+
+  // Serve plugin ESM bundles and manifests in both development and production
+  app.use(
+    "/plugins",
+    express.static(path.resolve(__dirname, "plugins"), {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".js") || filePath.endsWith(".mjs")) {
+          res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+        }
+      },
+    }),
+  );
+
+  // Always serve static assets from public/ (icons, manifests, packages)
   app.use(express.static(path.resolve(__dirname, "public")));
 
+  const distDir = path.resolve(__dirname, "dist");
+  const distIndexPath = path.join(distDir, "index.html");
   const isProduction =
     process.env.NODE_ENV === "production" ||
-    (fs.existsSync(path.resolve(__dirname, "dist", "index.html")) &&
+    (fs.existsSync(distIndexPath) &&
       !fs.existsSync(path.resolve(__dirname, "src", "main.jsx")));
 
   if (!isProduction) {
@@ -1419,13 +1437,17 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, "dist")));
+    app.use(express.static(distDir));
     app.get("*", (_req, res) => {
-      res.sendFile(path.resolve(__dirname, "dist", "index.html"));
+      res.sendFile(distIndexPath);
     });
   }
+
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ShiftPulse Posredovanje Server running on port ${PORT}`);
+    console.log(
+      `[Server] ShiftPulse Ledger Pro running in ${isProduction ? "production" : "development"} mode on port ${PORT}`,
+    );
   });
 }
+
 startServer();

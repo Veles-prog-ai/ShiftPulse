@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useShift } from "../context/ShiftContext";
 import { useLanguage, interpolate } from "../i18n/LanguageContext";
+import { PluginActionButtons } from "../plugins/PluginContext";
+import { pluginManager } from "../plugins/PluginManager";
 import {
   Building,
   Users,
@@ -184,6 +186,11 @@ ${stavkeXml}
   const handleDownloadXml = async () => {
     if (!activeCompany) return;
     try {
+      await pluginManager.runBeforeReportExportHooks({
+        reportType: "ppp-pd-xml",
+        activeCompany,
+        recordCount: currentEmployees.length,
+      });
       const xmlText = buildLocalPppPdXml();
       const filename = `PPP-PD_${activeCompany.pib}_${new Date().toISOString().slice(0, 7)}.xml`;
       const blob = new Blob([xmlText], { type: "application/xml;charset=utf-8" });
@@ -314,8 +321,13 @@ ${stavkeXml}
     });
     setIsAddEmployeeOpen(true);
   };
-  const handleExportCsv = () => {
+  const handleExportCsv = async () => {
     if (!activeCompany || currentEmployees.length === 0) return;
+    await pluginManager.runBeforeReportExportHooks({
+      reportType: "payroll-csv",
+      activeCompany,
+      recordCount: currentEmployees.length,
+    });
     const ch = t.ui.ledger?.csvHeaders || {};
     const headers = [
       ch.worker || "Employee",
@@ -683,6 +695,11 @@ ${stavkeXml}
               <Send className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{l.sendClientBtn}</span>
             </button>
+
+            <PluginActionButtons
+              slot="ledger-toolbar"
+              context={{ activeCompany, currentEmployees, companyMetrics }}
+            />
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useShift } from "../context/ShiftContext";
 import { useLanguage } from "../i18n/LanguageContext";
+import { usePlugins } from "../plugins/PluginContext";
 import {
   Clock,
   Coffee,
@@ -16,6 +17,7 @@ import {
   UserCheck,
   Compass,
   Globe,
+  Puzzle,
 } from "lucide-react";
 import { DataManagementModal } from "./DataManagementModal";
 import { CommunicationHubModal } from "./CommunicationHubModal";
@@ -47,7 +49,9 @@ export const Header = () => {
     isStartMenuOpen,
     openStartMenu,
     closeStartMenu,
+    setCurrentTab,
   } = useShift();
+  const { customRoutes, reloadPlugins } = usePlugins();
   const { t, language, setLanguage, supportedLanguages } = useLanguage();
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [isAccountsHitlOpen, setIsAccountsHitlOpen] = useState(false);
@@ -257,6 +261,20 @@ export const Header = () => {
               <Coffee className="w-4 h-4 text-amber-500" />
             </button>
 
+            {/* Plugin-Registered Custom Routes */}
+            {customRoutes.map((route) => (
+              <button
+                key={`${route.pluginId}:${route.path}`}
+                type="button"
+                onClick={() => setCurrentTab(`plugin:${route.path}`)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors font-semibold text-xs cursor-pointer whitespace-nowrap shrink-0"
+                title={`${route.title} (${route.pluginId})`}
+              >
+                <Puzzle className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">{route.title}</span>
+              </button>
+            ))}
+
             {/* B2B Commercial License Status */}
             <button
               onClick={() => setIsLicenseModalOpen(true)}
@@ -344,6 +362,7 @@ export const Header = () => {
       {isLicenseModalOpen && (
         <B2BLicenseManagementModal
           onClose={() => setIsLicenseModalOpen(false)}
+          onLicenseUpdated={() => reloadPlugins()}
         />
       )}
 

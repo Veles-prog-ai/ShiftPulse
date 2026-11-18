@@ -120,7 +120,7 @@ function computeInlineTokenDiff(beforeLine, afterLine) {
   const m = a.length;
   const n = b.length;
 
-  // Ako su redovi predugački, direktan fallback bez O(m*n) alokacije
+  // Fallback directly if line pairs are too large for O(m*n) matrix allocation
   if (m * n > 4000) {
     return {
       beforeTokens: [{ text: beforeLine, changed: true }],
@@ -161,8 +161,8 @@ function computeInlineTokenDiff(beforeLine, afterLine) {
 }
 
 /**
- * Pure-JS paralelni (side-by-side) diff engine za zakonske odredbe.
- * Poredi stare i nove članove zakona sa minimalnom upotrebom memorije.
+ * Pure-JS side-by-side diff engine for statutory legal clauses.
+ * Compares baseline and amended provisions with minimal memory overhead.
  */
 export function computeSideBySideDiff(beforeText, afterText) {
   const beforeLines = String(beforeText || "")
@@ -202,7 +202,7 @@ export function computeSideBySideDiff(beforeText, afterText) {
     }
   }
 
-  // Upari uzastopne removed + added u "modified" redove za pravi paralelni prikaz
+  // Pair consecutive removed + added operations into "modified" rows for true side-by-side display
   const rows = [];
   let idx = 0;
   let addedCount = 0;
@@ -347,7 +347,7 @@ export function createLegalMonitorService(dataDir) {
   };
 
   /**
-   * Lagana provera zvaničnih izvora (HTTP HEAD sa timeout-om od 3.5s, bez DOM parsiranja ili AI troškova).
+   * Lightweight check of official regulatory sources (HTTP HEAD with 3.5s timeout; no DOM parsing or AI cost).
    */
   const runLightweightHttpChecks = async () => {
     const startMs = Date.now();
@@ -386,12 +386,12 @@ export function createLegalMonitorService(dataDir) {
             lawId: law.id,
             lawCode: law.code,
             lawTitle: law.title,
-            articleLabel: "Detektovana izmena zaglavlja zvaničnog izvora (HTTP ETag / Last-Modified)",
+            articleLabel: "Official source header change detected (HTTP ETag / Last-Modified)",
             severity: "medium",
             detectedAt: checkedAt,
             acknowledged: false,
             sourceUrl: law.officialUrl,
-            summary: `Zvanični izvor za ${law.code} je vratio izmenjeni ETag / Last-Modified zaglavlje (HTTP ${res.status}). Preporučena verifikacija izmena teksta.`,
+            summary: `Official source for ${law.code} returned modified ETag / Last-Modified headers (HTTP ${res.status}). Manual clause verification recommended.`,
             baselineText: law.baselineText,
             amendedText: law.baselineText,
             sideBySideDiff: computeSideBySideDiff(law.baselineText, law.baselineText),
@@ -423,23 +423,23 @@ export function createLegalMonitorService(dataDir) {
   };
 
   /**
-   * Poređenje važeće baze zakona sa novim/predloženim tekstom zakonskog akta
-   * i generisanje Admin notifikacije sa paralelnim prikazom izmenjenih delova.
+   * Compares current baseline text against proposed statutory text
+   * and creates an Admin notification with side-by-side diff highlighting.
    */
   const compareClauseAndNotifyAdmin = ({
     lawId,
     updatedText,
-    articleLabel = "Izmena zakonske odredbe",
+    articleLabel = "Statutory clause amendment",
     summaryNote = "",
     severity = "high",
   }) => {
     const law = state.laws.find((l) => l.id === lawId);
     if (!law) {
-      return { success: false, error: "Zakon nije pronađen u monitor registru." };
+      return { success: false, error: "Law not found in monitor registry." };
     }
     const cleanNew = String(updatedText || "").trim();
     if (!cleanNew) {
-      return { success: false, error: "Nedostaje novi tekst zakonske odredbe za poređenje." };
+      return { success: false, error: "Missing updated statutory text for comparison." };
     }
 
     const diff = computeSideBySideDiff(law.baselineText, cleanNew);
@@ -447,7 +447,7 @@ export function createLegalMonitorService(dataDir) {
       return {
         success: true,
         hasChanges: false,
-        message: "Nisu uočene razlike u odnosu na trenutno aktivnu bazu zakona.",
+        message: "No differences detected compared to the currently active baseline.",
         sideBySideDiff: diff,
       };
     }
@@ -466,7 +466,7 @@ export function createLegalMonitorService(dataDir) {
       afterHash: sha256Text(cleanNew),
       summary:
         summaryNote ||
-        `Uočena izmena (${diff.stats.modifiedCount} izmenjenih, ${diff.stats.addedCount} dodatih, ${diff.stats.removedCount} uklonjenih odredbi) u ${law.code}.`,
+        `Amendment detected (${diff.stats.modifiedCount} modified, ${diff.stats.addedCount} added, ${diff.stats.removedCount} removed clauses) in ${law.code}.`,
       baselineText: law.baselineText,
       amendedText: cleanNew,
       sideBySideDiff: diff,
@@ -486,7 +486,7 @@ export function createLegalMonitorService(dataDir) {
   const acknowledgeNotification = (notificationId, { adoptAsBaseline = false } = {}) => {
     const target = state.notifications.find((n) => n.id === notificationId);
     if (!target) {
-      return { success: false, error: "Notifikacija nije pronađena." };
+      return { success: false, error: "Notification not found." };
     }
     target.acknowledged = true;
     target.acknowledgedAt = new Date().toISOString();
@@ -503,7 +503,7 @@ export function createLegalMonitorService(dataDir) {
     return { success: true, notification: target };
   };
 
-  // Pokreni laganu periodičnu proveru svakih 12 sati bez blokiranja gašenja procesa
+  // Run lightweight periodic check every 12 hours without keeping the Node event loop alive
   const timer = setInterval(() => {
     runLightweightHttpChecks().catch(() => {});
   }, 12 * 60 * 60 * 1000);

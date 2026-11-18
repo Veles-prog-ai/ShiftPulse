@@ -1,4 +1,4 @@
-// main.js - Electron Desktop Launcher za ShiftPulse Ledger Pro
+// main.js - Electron Desktop Launcher for ShiftPulse Ledger Pro
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -8,7 +8,7 @@ let serverProcess = null;
 
 function startBackendServer() {
   try {
-    // Pokrećemo server.js ili server.ts kao lokalni background proces
+    // Launch server.js as a local workstation background process
     const serverScript = path.join(__dirname, 'server.js');
     serverProcess = spawn('node', [serverScript], {
       env: { ...process.env, PORT: '3000', NODE_ENV: 'production', SHIFTPULSE_LOCAL_DESKTOP: '1' },
@@ -16,10 +16,10 @@ function startBackendServer() {
     });
 
     serverProcess.on('error', (err) => {
-      console.error('Greška pri pokretanju pozadinskog servera:', err);
+      console.error('Error starting local backend server:', err);
     });
   } catch (err) {
-    console.error('Neuspešno pokretanje internog servera:', err);
+    console.error('Failed to spawn internal server:', err);
   }
 }
 
@@ -39,11 +39,11 @@ function createWindow() {
     autoHideMenuBar: false
   });
 
-  // Učitavamo lokalni server stanice
+  // Load the local workstation server URL
   const targetUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000';
   mainWindow.loadURL(targetUrl);
 
-  // Otvaranje eksternih linkova u sistemskom browseru
+  // Open external links in the default OS browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
@@ -55,12 +55,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Pokreni interni server ako nije aktivan eksterni URL
+  // Start internal backend server if no external URL override is set
   if (!process.env.ELECTRON_START_URL) {
     startBackendServer();
   }
 
-  // Kratka pauza za inicijalizaciju porta
+  // Wait briefly for server port initialization
   setTimeout(createWindow, 1200);
 
   app.on('activate', () => {
