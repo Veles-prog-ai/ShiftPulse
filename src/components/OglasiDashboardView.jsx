@@ -1,11 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import { useShift } from "../context/ShiftContext";
-import { Search, Handshake } from "lucide-react";
+import { useLanguage } from "../i18n/LanguageContext";
+import { Search, Handshake, AlertCircle } from "lucide-react";
+
 export const OglasiDashboardView = () => {
   const { activeCompany } = useShift();
+  const { t } = useLanguage();
   const [filterTip, setFilterTip] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isOpenForm, setIsOpenForm] = useState(false);
+  const [formNotice, setFormNotice] = useState("");
   const [oglasi, setOglasi] = useState([]);
   const [form, setForm] = useState({
     naslovPozicije: "",
@@ -13,24 +17,27 @@ export const OglasiDashboardView = () => {
     detaljniUslovi: "",
     budzetSatnica: 500,
     valuta: "RSD",
-    lokacijaRada: "Obrenovac",
-    trajanjeAngazmana: "Projektno",
+    lokacijaRada: "",
+    trajanjeAngazmana: "Project-based",
     posrednickaProvizija: "50 RSD/h",
     interneBeleskeAgencije: "",
     status: "otvoren",
   });
+
   const ucitajOglase = async () => {
     try {
       const res = await fetch("/api/posredovanje/oglasi");
       const data = await res.json();
-      if (data.success) setOglasi(data.oglasi);
+      if (data.success) setOglasi(data.oglasi || []);
     } catch (e) {
       console.error(e);
     }
   };
+
   useEffect(() => {
     ucitajOglase();
   }, []);
+
   const filtriraniLogovi = useMemo(() => {
     return oglasi.filter((o) => {
       if (filterTip !== "all" && o.tipOglasa !== filterTip) return false;
@@ -44,10 +51,15 @@ export const OglasiDashboardView = () => {
       return true;
     });
   }, [oglasi, filterTip, searchQuery]);
+
   const handleLogNeed = async (e) => {
     e.preventDefault();
-    if (!activeCompany)
-      return alert("Izaberite aktivnog klijenta u gornjem meniju aplikacije.");
+    setFormNotice("");
+    if (!activeCompany) {
+      setFormNotice(t.ui.oglasi.selectClientError);
+      return;
+    }
+
     const payload = {
       clientId: activeCompany.id,
       clientName: activeCompany.naziv,
@@ -64,6 +76,7 @@ export const OglasiDashboardView = () => {
       interneBeleskeAgencije: form.interneBeleskeAgencije,
       potencijalniMatchIds: [],
     };
+
     try {
       const res = await fetch("/api/posredovanje/kreiraj", {
         method: "POST",
@@ -74,11 +87,16 @@ export const OglasiDashboardView = () => {
       if (data.success) {
         setOglasi((prev) => [data.oglas, ...prev]);
         setIsOpenForm(false);
+        setFormNotice("");
+      } else {
+        setFormNotice(t.ui.oglasi.saveError);
       }
     } catch (err) {
       console.error(err);
+      setFormNotice(t.ui.oglasi.gatewayError);
     }
   };
+
   const handlePromeniStatus = async (id, noviStatus) => {
     try {
       const res = await fetch(`/api/posredovanje/status/${id}`, {
@@ -95,29 +113,35 @@ export const OglasiDashboardView = () => {
       console.error(err);
     }
   };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-2 sm:p-4">
-      <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-5 rounded-2xl border border-indigo-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider">
             <Handshake className="w-4 h-4 text-amber-500" />
-            <span>Klijentski Matchmaking & Evidencija Posredovanja</span>
+            <span>{t.ui.oglasi.badge}</span>
           </div>
-          <h2 className="text-xl font-black">
-            Interna Baza Potražnje i Slobodnih Kapaciteta
-          </h2>
-          <p className="text-xs text-indigo-200/80">
-            Pratite šta vaše firme potražuju, a šta frilenseri nude, i uzmite
-            proviziju za uspešan spoj.
-          </p>
+          <h2 className="text-xl font-black mt-0.5">{t.ui.oglasi.title}</h2>
+          <p className="text-xs text-slate-300 mt-0.5">{t.ui.oglasi.subtitle}</p>
         </div>
         <button
-          onClick={() => setIsOpenForm(!isOpenForm)}
-          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-xs rounded-xl shadow-md"
+          onClick={() => {
+            setFormNotice("");
+            setIsOpenForm(!isOpenForm);
+          }}
+          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
         >
-          {isOpenForm ? "Zatvori unos" : "Zabele\u017Ei Potrebu Klijenta"}
+          {isOpenForm ? t.ui.oglasi.closeForm : t.ui.oglasi.logRequirement}
         </button>
       </div>
+
+      {formNotice && (
+        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-700 dark:text-rose-300 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{formNotice}</span>
+        </div>
+      )}
 
       {isOpenForm && (
         <form
@@ -126,21 +150,21 @@ export const OglasiDashboardView = () => {
         >
           <div className="space-y-3">
             <div>
-              <label className="block font-bold text-slate-400 text-[10px] mb-1">
-                Aktivni klijent (izabran u zaglavlju)
+              <label className="block font-bold text-slate-400 text-[10px] uppercase mb-1">
+                {t.ui.oglasi.activeClientLabel}
               </label>
               <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl font-black text-indigo-600 dark:text-indigo-400">
-                {activeCompany ? activeCompany.naziv : "Nije izabran klijent"}
+                {activeCompany ? activeCompany.naziv : t.ui.oglasi.noActiveClient}
               </div>
             </div>
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Naslov pozicije / projekta
+                {t.ui.oglasi.positionTitle}
               </label>
               <input
                 type="text"
                 required
-                placeholder="npr. Potreban operater na CNC glodalici"
+                placeholder={t.ui.oglasi.positionPlaceholder}
                 value={form.naslovPozicije}
                 onChange={(e) =>
                   setForm({ ...form, naslovPozicije: e.target.value })
@@ -151,7 +175,7 @@ export const OglasiDashboardView = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Klasifikacija zapisa
+                  {t.ui.oglasi.classificationLabel}
                 </label>
                 <select
                   value={form.tipOglasa}
@@ -161,19 +185,19 @@ export const OglasiDashboardView = () => {
                   className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-bold text-slate-900 dark:text-white"
                 >
                   <option value="potraznja_radnika">
-                    🏭 Firma traži radnike na ugovor
+                    {t.ui.oglasi.typeStaff}
                   </option>
                   <option value="potraznja_podizvodjaca">
-                    🤝 Firma traži podizvođača
+                    {t.ui.oglasi.typeSubcontractor}
                   </option>
                   <option value="freelance_ponuda_posla">
-                    💻 Freelancer nudi kapacitet / traži posao
+                    {t.ui.oglasi.typeFreelance}
                   </option>
                 </select>
               </div>
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Budžet / Satnica
+                  {t.ui.oglasi.budgetLabel}
                 </label>
                 <div className="flex gap-1">
                   <input
@@ -206,11 +230,11 @@ export const OglasiDashboardView = () => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                  Agencijska Provizija
+                  {t.ui.oglasi.commissionLabel}
                 </label>
                 <input
                   type="text"
-                  placeholder="npr. 50 RSD/h ili 10% fiksno"
+                  placeholder={t.ui.oglasi.commissionPlaceholder}
                   value={form.posrednickaProvizija}
                   onChange={(e) =>
                     setForm({ ...form, posrednickaProvizija: e.target.value })
@@ -220,7 +244,7 @@ export const OglasiDashboardView = () => {
               </div>
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Lokacija
+                  {t.ui.oglasi.locationLabel}
                 </label>
                 <input
                   type="text"
@@ -234,11 +258,11 @@ export const OglasiDashboardView = () => {
             </div>
             <div>
               <label className="block font-bold text-amber-600 mb-1">
-                🔒 Interne beleške agencije (Nevidljivo za klijente)
+                {t.ui.oglasi.notesLabel}
               </label>
               <textarea
                 rows={2}
-                placeholder="Upisati poverljive informacije, pouzdanost isplate i planove za spajanje..."
+                placeholder={t.ui.oglasi.notesPlaceholder}
                 value={form.interneBeleskeAgencije}
                 onChange={(e) =>
                   setForm({ ...form, interneBeleskeAgencije: e.target.value })
@@ -248,11 +272,11 @@ export const OglasiDashboardView = () => {
             </div>
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Opis zahteva i veština
+                {t.ui.oglasi.scopeLabel}
               </label>
               <input
                 type="text"
-                placeholder="Tehnički detalji, obim posla..."
+                placeholder={t.ui.oglasi.scopePlaceholder}
                 value={form.detaljniUslovi}
                 onChange={(e) =>
                   setForm({ ...form, detaljniUslovi: e.target.value })
@@ -262,15 +286,15 @@ export const OglasiDashboardView = () => {
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-xl shadow-md"
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-md transition-colors cursor-pointer"
             >
-              💾 Upiši u interni registar
+              {t.ui.oglasi.saveBtn}
             </button>
           </div>
         </form>
       )}
 
-      {/* FILTERI */}
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
         <div className="relative flex-1 max-w-sm">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -278,11 +302,11 @@ export const OglasiDashboardView = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Pretraži zahteve klijenata..."
+            placeholder={t.ui.oglasi.searchPlaceholder}
             className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
             "all",
             "potraznja_radnika",
@@ -292,91 +316,101 @@ export const OglasiDashboardView = () => {
             <button
               key={tip}
               onClick={() => setFilterTip(tip)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold ${filterTip === tip ? "bg-indigo-600 text-white" : "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${filterTip === tip ? "bg-indigo-600 text-white" : "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
             >
-              {tip === "all" && "Svi upisi"}
-              {tip === "potraznja_radnika" && "\u{1F3ED} Tra\u017Ee radnike"}
-              {tip === "potraznja_podizvodjaca" &&
-                "\u{1F91D} Tra\u017Ee podizvo\u0111a\u010De"}
-              {tip === "freelance_ponuda_posla" && "\u{1F4BB} Freelance ponude"}
+              {tip === "all" && t.ui.oglasi.filterAll}
+              {tip === "potraznja_radnika" && t.ui.oglasi.filterStaff}
+              {tip === "potraznja_podizvodjaca" && t.ui.oglasi.filterSubcontractor}
+              {tip === "freelance_ponuda_posla" && t.ui.oglasi.filterFreelance}
             </button>
           ))}
         </div>
       </div>
 
-      {/* REZULTATI MATČOVANJA */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtriraniLogovi.map((log) => (
-          <div
-            key={log.id}
-            className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-3"
-          >
-            <div>
-              <div className="flex justify-between items-start gap-2 mb-2">
-                <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                  {log.tipOglasa === "potraznja_radnika"
-                    ? "Potra\u017Enja radnika"
-                    : log.tipOglasa === "potraznja_podizvodjaca"
-                      ? "Potra\u017Enja podizvo\u0111a\u010Da"
-                      : "Frilens ponuda"}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.status === "uspesno_spojen" ? "bg-emerald-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
-                >
-                  {log.status === "otvoren"
-                    ? "Otvoreno"
-                    : log.status === "u_pregovorima"
-                      ? "U pregovorima"
-                      : "Realizovano spajanje"}
-                </span>
-              </div>
-
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                {log.naslovPozicije}
-              </h3>
-              <p className="text-xs font-semibold text-slate-500 mb-2">
-                Klijent: {log.clientName}
-              </p>
-              <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                {log.detaljniUslovi}
-              </p>
-
-              {log.interneBeleskeAgencije && (
-                <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg border border-amber-200 dark:border-amber-900">
-                  🔒 Interna agencijska beleška: "{log.interneBeleskeAgencije}"
+      {/* Results */}
+      {filtriraniLogovi.length === 0 ? (
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-2">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+            {t.ui.oglasi.emptyTitle}
+          </p>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            {t.ui.oglasi.emptyBody}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filtriraniLogovi.map((log) => (
+            <div
+              key={log.id}
+              className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-3"
+            >
+              <div>
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                    {log.tipOglasa === "potraznja_radnika"
+                      ? t.ui.oglasi.badgeStaff
+                      : log.tipOglasa === "potraznja_podizvodjaca"
+                        ? t.ui.oglasi.badgeSubcontractor
+                        : t.ui.oglasi.badgeFreelance}
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.status === "uspesno_spojen" ? "bg-emerald-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"}`}
+                  >
+                    {log.status === "otvoren"
+                      ? t.ui.oglasi.statusOpen
+                      : log.status === "u_pregovorima"
+                        ? t.ui.oglasi.statusNegotiation
+                        : t.ui.oglasi.statusPlaced}
+                  </span>
                 </div>
-              )}
-            </div>
 
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
-              <div className="space-y-0.5">
-                <span className="text-slate-500 block text-[10px]">
-                  📍 {log.lokacijaRada}
-                </span>
-                <span className="text-indigo-600 dark:text-indigo-400 block text-[10px]">
-                  Provizija: {log.posrednickaProvizija}
-                </span>
-                <span className="text-slate-900 dark:text-white block font-mono">
-                  Budžet: {log.budzetSatnica} {log.valuta}/h
-                </span>
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm">
+                  {log.naslovPozicije}
+                </h3>
+                <p className="text-xs font-semibold text-slate-500 mb-2">
+                  {t.ui.oglasi.clientPrefix}: {log.clientName}
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  {log.detaljniUslovi}
+                </p>
+
+                {log.interneBeleskeAgencije && (
+                  <div className="mt-2 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg border border-amber-200 dark:border-amber-900">
+                    {t.ui.oglasi.internalNotePrefix}: &ldquo;{log.interneBeleskeAgencije}&rdquo;
+                  </div>
+                )}
               </div>
 
-              {log.status !== "uspesno_spojen" ? (
-                <button
-                  onClick={() => handlePromeniStatus(log.id, "uspesno_spojen")}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-sm transition-all"
-                >
-                  ✓ Zatvori i naplati
-                </button>
-              ) : (
-                <span className="text-emerald-600 font-bold text-xs">
-                  ✓ Realizovano
-                </span>
-              )}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
+                <div className="space-y-0.5">
+                  <span className="text-slate-500 block text-[10px]">
+                    {t.ui.oglasi.locationPrefix}: {log.lokacijaRada}
+                  </span>
+                  <span className="text-indigo-600 dark:text-indigo-400 block text-[10px]">
+                    {t.ui.oglasi.commissionPrefix}: {log.posrednickaProvizija}
+                  </span>
+                  <span className="text-slate-900 dark:text-white block font-mono">
+                    {t.ui.oglasi.budgetPrefix}: {log.budzetSatnica} {log.valuta}{t.ui.common.perHour}
+                  </span>
+                </div>
+
+                {log.status !== "uspesno_spojen" ? (
+                  <button
+                    onClick={() => handlePromeniStatus(log.id, "uspesno_spojen")}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-sm transition-all cursor-pointer"
+                  >
+                    {t.ui.oglasi.markPlacedBtn}
+                  </button>
+                ) : (
+                  <span className="text-emerald-600 font-bold text-xs">
+                    {t.ui.oglasi.placedLabel}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

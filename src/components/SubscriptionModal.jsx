@@ -43,8 +43,8 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
       title: t.premium.featureUnlimitedJobs,
       desc: t.premium.featureUnlimitedJobsDesc,
       icon: Briefcase,
-      free: "2 Max",
-      pro: "Unlimited",
+      free: t.ui.subscription.freeMax2,
+      pro: t.ui.subscription.proUnlimited,
     },
     {
       title: t.premium.featureCircadianSleep,
@@ -57,8 +57,8 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
       title: t.premium.featureAdvancedRosters,
       desc: t.premium.featureAdvancedRostersDesc,
       icon: Calendar,
-      free: "Basic (4-5d)",
-      pro: "Full 8d + Custom",
+      free: t.ui.subscription.freeBasic,
+      pro: t.ui.subscription.proFull,
     },
     {
       title: t.premium.featureCsvExport,
@@ -119,7 +119,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 text-slate-800 dark:text-slate-100">
-          {/* Quick Test Mode Switcher for Instant Testing */}
+          {/* Plan Tier Status */}
           <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
             <div>
               <div className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -133,9 +133,8 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
                 </strong>
               </p>
             </div>
-            <button
-              onClick={() => setIsPremium(!isPremium)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-colors shadow-sm ${isPremium ? "bg-amber-500 hover:bg-amber-600 text-slate-950" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300"}`}
+            <span
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-sm ${isPremium ? "bg-amber-500 text-slate-950" : "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200"}`}
             >
               {isPremium ? (
                 <ToggleRight className="w-5 h-5 text-slate-950" />
@@ -145,7 +144,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
               <span>
                 {isPremium ? t.premium.proBadge : t.premium.freeBadge}
               </span>
-            </button>
+            </span>
           </div>
 
           {/* Pricing Plans Toggle */}
@@ -191,7 +190,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 mt-1">
-                Cancel anytime
+                {t.ui.subscription.cancelAnytime}
               </div>
             </div>
           </div>
@@ -199,7 +198,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
           {/* Features Comparison List */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Free vs Pro Comparison
+              {t.ui.subscription.comparisonTitle}
             </h4>
             <div className="divide-y divide-slate-100 dark:divide-slate-800 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 overflow-hidden text-xs">
               {features.map((item, idx) => {
@@ -235,7 +234,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
                         <Check className="w-3.5 h-3.5" />
                         <span>
                           {typeof item.pro === "boolean"
-                            ? "Included"
+                            ? t.ui.subscription.included
                             : item.pro}
                         </span>
                       </div>
@@ -253,12 +252,10 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
             {isPremium ? (
               <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" />
-                ShiftPulse Pro is currently active on this device.
+                {t.ui.subscription.activeOnDevice}
               </span>
             ) : (
-              <span>
-                14-day free trial. Instant local unlock. No commitments.
-              </span>
+              <span>{t.ui.subscription.trialNote}</span>
             )}
           </div>
 
@@ -278,7 +275,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
                 {justActivated ? (
                   <>
                     <Check className="w-4 h-4 text-slate-950" />
-                    <span>Unlocked!</span>
+                    <span>{t.ui.subscription.unlocked}</span>
                   </>
                 ) : (
                   <>

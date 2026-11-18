@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useShift } from "../context/ShiftContext";
+import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import {
   Building,
   Landmark,
@@ -29,6 +30,8 @@ export const BankPaymentOrdersView = () => {
     calculatePayrollForCompany,
     setCurrentTab,
   } = useShift();
+  const { t, intlLocale } = useLanguage();
+  const s = t.ui.bankOrdersExtra;
   const [selectedBank, setSelectedBank] = useState("intesa");
   const [selectedSlipForQr, setSelectedSlipForQr] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -101,15 +104,14 @@ export const BankPaymentOrdersView = () => {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Povezivanje sa Bankama i Izrada Naloga za Isplatu Plata
+                  {s.title}
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                  Automatski Virmani (Šifra 240 / 253)
+                  {s.badge}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Automatska izrada naloga za prenos plata i poreza/doprinosa na
-                osnovu evidencije satnice i noćnih smena (+26%)
+                {s.subtitle}
               </p>
             </div>
           </div>
@@ -164,7 +166,7 @@ export const BankPaymentOrdersView = () => {
               <RefreshCw
                 className={`w-3.5 h-3.5 text-indigo-500 ${isCalculating ? "animate-spin" : ""}`}
               />
-              <span>Ažuriraj obračun</span>
+              <span>{s.recalculateBtn}</span>
             </button>
           </div>
         </div>
@@ -173,7 +175,7 @@ export const BankPaymentOrdersView = () => {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs">
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
             <span className="text-slate-400 block text-[11px]">
-              Platni račun poslodavca
+              {s.employerAccLabel}
             </span>
             <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
               {activeClient?.iban || "160-0000000123456-78"}
@@ -182,29 +184,28 @@ export const BankPaymentOrdersView = () => {
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
             <span className="text-slate-400 block text-[11px]">
-              Format elektronskog bankarstva
+              {s.ebankingFormatLabel}
             </span>
             <span className="font-bold text-emerald-600 dark:text-emerald-400 text-xs">
-              Halcom MultiCash TXT + ISO 20022 XML
+              {s.ebankingFormatVal}
             </span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
             <span className="text-slate-400 block text-[11px]">
-              NBS IPS Instant plaćanje
+              {s.nbsIpsLabel}
             </span>
             <span className="font-bold text-slate-800 dark:text-slate-200 text-xs flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Podržan
-              zvanični NBS QR kod
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> {s.nbsIpsVal}
             </span>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
             <span className="text-slate-400 block text-[11px]">
-              Poreski period
+              {s.taxPeriodLabel}
             </span>
             <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">
-              {currentPeriod} (Zarade meseca)
+              {currentPeriod} {s.taxPeriodSuffix}
             </span>
           </div>
         </div>
@@ -216,14 +217,13 @@ export const BankPaymentOrdersView = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-indigo-900/60">
             <div>
               <div className="text-xs uppercase font-mono text-indigo-300 font-bold">
-                Zbirni finansijski nalog za isplatu
+                {s.summarySub}
               </div>
               <h2 className="text-xl sm:text-2xl font-black tracking-tight mt-0.5">
                 {activeClient.naziv}
               </h2>
               <p className="text-xs text-indigo-200/80 mt-1">
-                Generisano na osnovu zbira redovnih sati, noćnog rada (+26%) i
-                prekovremenih sati za {activeEmployees.length} zaposlenih
+                {interpolate(s.summaryDesc, { count: activeEmployees.length })}
               </p>
             </div>
 
@@ -232,28 +232,28 @@ export const BankPaymentOrdersView = () => {
               <button
                 onClick={handleDownloadHalcom}
                 className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-                title="Preuzmi Halcom TXT platni fajl za uvoz u e-banking"
+                title={s.halcomTitle}
               >
                 <Download className="w-4 h-4" />
-                <span>Preuzmi Halcom E-Bank (.txt)</span>
+                <span>{s.downloadHalcom}</span>
               </button>
 
               <button
                 onClick={handleDownloadXml}
                 className="flex items-center gap-2 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                title="Preuzmi zvanični ISO 20022 XML format za savremene banke"
+                title={s.xmlTitle}
               >
                 <FileText className="w-4 h-4" />
-                <span>ISO 20022 XML</span>
+                <span>{s.xmlBtn}</span>
               </button>
 
               <button
                 onClick={handlePrintSlips}
                 className="flex items-center gap-2 px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
-                title="Štampaj virmane za šalter ili arhivu"
+                title={s.printTitle}
               >
                 <Printer className="w-4 h-4" />
-                <span className="hidden sm:inline">Štampaj Virmane</span>
+                <span className="hidden sm:inline">{s.printBtn}</span>
               </button>
             </div>
           </div>
@@ -262,52 +262,52 @@ export const BankPaymentOrdersView = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
               <span className="text-indigo-200 text-xs block">
-                Neto zarade za isplatu radnicima
+                {s.netCardTitle}
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-emerald-400 mt-1 block">
-                {payrollBatch.totalNetSalaries.toLocaleString("sr-RS")} RSD
+                {payrollBatch.totalNetSalaries.toLocaleString(intlLocale)} RSD
               </span>
               <span className="text-[11px] text-indigo-300 font-mono">
-                Šifra plaćanja: 240
+                {s.code240}
               </span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
               <span className="text-indigo-200 text-xs block">
-                Porezi i socijalni doprinosi (Trezor)
+                {s.taxCardTitle}
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-amber-300 mt-1 block">
                 {payrollBatch.totalTaxesAndContributions.toLocaleString(
-                  "sr-RS",
+                  intlLocale,
                 )}{" "}
                 RSD
               </span>
               <span className="text-[11px] text-indigo-300 font-mono">
-                Šifra plaćanja: 253 (BOP)
+                {s.code253}
               </span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
               <span className="text-indigo-200 text-xs block">
-                Ukupan teret poslodavca (Bruto II)
+                {s.gross2CardTitle}
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-white mt-1 block">
-                {payrollBatch.totalGrandPayroll.toLocaleString("sr-RS")} RSD
+                {payrollBatch.totalGrandPayroll.toLocaleString(intlLocale)} RSD
               </span>
               <span className="text-[11px] text-indigo-300 font-mono">
-                Ukupna uplata banke
+                {s.totalBankDebit}
               </span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/5 border border-white/10">
               <span className="text-indigo-200 text-xs block">
-                Broj pripremljenih virmana
+                {s.countCardTitle}
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-sky-400 mt-1 block">
-                {payrollBatch.ordersCount} naloga
+                {interpolate(s.ordersSuffix, { count: payrollBatch.ordersCount })}
               </span>
               <span className="text-[11px] text-indigo-300 font-mono">
-                Spremni za realizaciju
+                {s.readyExec}
               </span>
             </div>
           </div>
@@ -320,12 +320,10 @@ export const BankPaymentOrdersView = () => {
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <FileText className="w-5 h-5 text-indigo-600" />
-              Nalozi za prenos (Virmani) pripremljeni za banku
+              {s.slipsHeading}
             </h3>
             <p className="text-xs text-slate-500">
-              Svaki nalog sadrži propisane elemente platnog prometa NBS:
-              uplatilac, primalac, račun, iznos, šifra plaćanja i model/poziv na
-              broj
+              {s.slipsSub}
             </p>
           </div>
 
@@ -333,7 +331,7 @@ export const BankPaymentOrdersView = () => {
             onClick={() => setCurrentTab("clients")}
             className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span>Pogledaj dosijee firmi i radnika</span>
+            <span>{s.viewDossiersBtn}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -358,9 +356,7 @@ export const BankPaymentOrdersView = () => {
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${isSalary ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300" : "bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300"}`}
                     >
-                      {isSalary
-                        ? "Isplata zarade zaposlenom"
-                        : "Poreska obaveza / Trezor"}
+                      {isSalary ? s.badgeSalary : s.badgeTax}
                     </span>
                   </div>
 
@@ -368,10 +364,10 @@ export const BankPaymentOrdersView = () => {
                     <button
                       onClick={() => setSelectedSlipForQr(order)}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold hover:bg-indigo-100 transition-colors cursor-pointer"
-                      title="Prikaži zvanični NBS IPS QR kod za skeniranje telefonom"
+                      title={s.nbsQrTitle}
                     >
                       <QrCode className="w-3.5 h-3.5" />
-                      <span>NBS QR</span>
+                      <span>{s.nbsQrBtn}</span>
                     </button>
                   </div>
                 </div>
@@ -382,7 +378,7 @@ export const BankPaymentOrdersView = () => {
                   <div className="col-span-12 sm:col-span-7 space-y-2">
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Uplatilac
+                        {s.payerLabel}
                       </span>
                       <div className="font-bold text-slate-900 dark:text-white truncate">
                         {order.payerName}
@@ -394,7 +390,7 @@ export const BankPaymentOrdersView = () => {
 
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Svrha uplate
+                        {s.purposeLabel}
                       </span>
                       <div className="font-medium text-slate-800 dark:text-slate-200 text-[11px]">
                         {order.paymentDescription}
@@ -403,7 +399,7 @@ export const BankPaymentOrdersView = () => {
 
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Primalac
+                        {s.recipientLabel}
                       </span>
                       <div className="font-bold text-slate-900 dark:text-white truncate">
                         {order.recipientName}
@@ -416,7 +412,7 @@ export const BankPaymentOrdersView = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                          Šifra
+                          {s.codeLabel}
                         </span>
                         <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400">
                           {order.purposeCode}
@@ -424,10 +420,10 @@ export const BankPaymentOrdersView = () => {
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                          Valuta & Iznos
+                          {s.currencyAmountLabel}
                         </span>
                         <span className="font-mono font-black text-sm text-slate-900 dark:text-white">
-                          {order.amount.toLocaleString("sr-RS")}{" "}
+                          {order.amount.toLocaleString(intlLocale)}{" "}
                           {order.currency}
                         </span>
                       </div>
@@ -435,7 +431,7 @@ export const BankPaymentOrdersView = () => {
 
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Račun primaoca
+                        {s.recipientAccLabel}
                       </span>
                       <div className="flex items-center justify-between font-mono font-bold text-[11px] text-slate-800 dark:text-slate-200">
                         <span className="truncate">
@@ -446,7 +442,7 @@ export const BankPaymentOrdersView = () => {
                             handleCopyAccount(order.recipientAccount, order.id)
                           }
                           className="p-1 text-slate-400 hover:text-indigo-600 cursor-pointer"
-                          title="Kopiraj račun"
+                          title={s.copyAccTitle}
                         >
                           {isCopied ? (
                             <Check className="w-3 h-3 text-emerald-500" />
@@ -459,7 +455,7 @@ export const BankPaymentOrdersView = () => {
 
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                        Model i poziv na broj
+                        {s.modelRefLabel}
                       </span>
                       <div className="font-mono text-[11px] text-slate-700 dark:text-slate-300">
                         <strong>{order.model}</strong> {order.referenceNumber}
@@ -483,11 +479,10 @@ export const BankPaymentOrdersView = () => {
 
             <div>
               <h4 className="text-base font-black text-slate-900 dark:text-white">
-                NBS IPS QR Kod za Instant Plaćanje
+                {s.qrModalTitle}
               </h4>
               <p className="text-xs text-slate-500 mt-1">
-                Zvanični standard Narodne Banke Srbije za mobilno bankarstvo
-                (Banca Intesa Mobi, Raiffeisen, OTP, UniCredit)
+                {s.qrModalDesc}
               </p>
             </div>
 
@@ -495,32 +490,32 @@ export const BankPaymentOrdersView = () => {
             <div className="p-4 bg-white rounded-2xl border-2 border-slate-900 shadow-inner flex flex-col items-center justify-center mx-auto w-52 h-52">
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(selectedSlipForQr.ipsQrString || "")}`}
-                alt="NBS IPS QR Kod"
+                alt={s.qrAlt}
                 className="w-44 h-44 object-contain"
               />
             </div>
 
             <div className="text-left p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-xs space-y-1 font-mono">
               <div className="text-slate-500 text-[10px]">
-                Primalac:{" "}
+                {s.qrRecipient}{" "}
                 <strong className="text-slate-900 dark:text-white font-sans">
                   {selectedSlipForQr.recipientName}
                 </strong>
               </div>
               <div className="text-slate-500 text-[10px]">
-                Račun:{" "}
+                {s.qrAccount}{" "}
                 <strong className="text-slate-900 dark:text-white">
                   {selectedSlipForQr.recipientAccount}
                 </strong>
               </div>
               <div className="text-slate-500 text-[10px]">
-                Iznos:{" "}
+                {s.qrAmount}{" "}
                 <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-sans">
-                  {selectedSlipForQr.amount.toLocaleString("sr-RS")} RSD
+                  {selectedSlipForQr.amount.toLocaleString(intlLocale)} RSD
                 </strong>
               </div>
               <div className="text-slate-500 text-[10px]">
-                Poziv:{" "}
+                {s.qrRef}{" "}
                 <strong>
                   {selectedSlipForQr.model} {selectedSlipForQr.referenceNumber}
                 </strong>
@@ -531,7 +526,7 @@ export const BankPaymentOrdersView = () => {
               onClick={() => setSelectedSlipForQr(null)}
               className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer"
             >
-              Zatvori
+              {t.common.close}
             </button>
           </div>
         </div>

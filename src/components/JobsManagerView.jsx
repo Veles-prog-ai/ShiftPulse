@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useShift } from "../context/ShiftContext";
-import { useLanguage } from "../i18n/LanguageContext";
+import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import { Briefcase, Plus, Edit3, Trash2, Crown } from "lucide-react";
 import { JobModal } from "./JobModal";
 export const JobsManagerView = () => {
@@ -9,6 +9,7 @@ export const JobsManagerView = () => {
   const { t } = useLanguage();
   const [editingJob, setEditingJob] = useState(null);
   const [isCreatingJob, setIsCreatingJob] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const getShiftCountForJob = (jobId) => {
     return shifts.filter((s) => s.jobId === jobId).length;
   };
@@ -31,7 +32,9 @@ export const JobsManagerView = () => {
             <span
               className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${isPremium ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
             >
-              {isPremium ? "Unlimited (PRO)" : `${jobs.length} / 2 (Free Tier)`}
+              {isPremium
+                ? t.ui.jobs.unlimitedPro
+                : interpolate(t.ui.jobs.freeTierCount, { count: jobs.length })}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mt-0.5">
@@ -53,7 +56,7 @@ export const JobsManagerView = () => {
             <Plus className="w-4 h-4" />
           )}
           <span>
-            {isAtFreeLimit ? "Unlock Unlimited (PRO)" : t.jobs.addJob}
+            {isAtFreeLimit ? t.ui.jobs.unlockProBtn : t.jobs.addJob}
           </span>
         </button>
       </div>
@@ -93,21 +96,34 @@ export const JobsManagerView = () => {
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
-                    {jobs.length > 1 && (
-                      <button
-                        onClick={() => {
-                          if (
-                            confirm(`${t.jobs.deleteConfirm} (${job.name})`)
-                          ) {
-                            deleteJob(job.id);
-                          }
-                        }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                        title={t.jobs.deleteJob}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+                    {jobs.length > 1 &&
+                      (confirmDeleteId === job.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              deleteJob(job.id);
+                              setConfirmDeleteId(null);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-bold hover:bg-rose-500 transition-colors"
+                          >
+                            {t.ui.common.confirmDelete}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-bold"
+                          >
+                            {t.ui.common.cancel}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(job.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title={t.jobs.deleteJob}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ))}
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useShift } from "../context/ShiftContext";
-import { useLanguage } from "../i18n/LanguageContext";
+import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -58,7 +58,9 @@ export const CalendarAndShiftsView = () => {
     setSelectedDate,
     setCurrentTab,
   } = useShift();
-  const { t } = useLanguage();
+  const { t, intlLocale, formatDate, formatMonthYear, getWeekdayName } =
+    useLanguage();
+  const cs = t.ui.calShiftsFull;
   const [clientTypeFilter, setClientTypeFilter] = useState("all");
   const [turnusShiftType, setTurnusShiftType] = useState("12h");
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
@@ -173,12 +175,16 @@ export const CalendarAndShiftsView = () => {
     return Array.from({ length: numDays }, (_, i) => {
       const d = i + 1;
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-      const dayOfWeek = new Date(year, month, d).toLocaleDateString("sr-RS", {
+      const dateObj = new Date(year, month, d);
+      const dayNum = dateObj.getDay();
+      const dayOfWeek = dateObj.toLocaleDateString(intlLocale, {
         weekday: "narrow",
       });
-      return { day: d, dateStr, dayOfWeek };
+      const dayOfWeekShort = getWeekdayName(dayNum, true);
+      const isWeekend = dayNum === 0 || dayNum === 6;
+      return { day: d, dateStr, dayOfWeek, dayOfWeekShort, isWeekend };
     });
-  }, [currentCalendarDate]);
+  }, [currentCalendarDate, intlLocale, getWeekdayName]);
   const eventsByDate = useMemo(() => {
     const map = /* @__PURE__ */ new Map();
     for (const ev of filteredEvents) {
@@ -233,42 +239,42 @@ export const CalendarAndShiftsView = () => {
     switch (category) {
       case "meeting":
         return {
-          label: "Sastanak",
+          label: cs.catBadges.meeting,
           bg: "bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
         };
       case "negotiation":
         return {
-          label: "Pregovori",
+          label: cs.catBadges.negotiation,
           bg: "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800",
         };
       case "tax_deadline":
         return {
-          label: "Poreski rok",
+          label: cs.catBadges.tax_deadline,
           bg: "bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800",
         };
       case "medical_bzr":
         return {
-          label: "Medicina rada",
+          label: cs.catBadges.medical_bzr,
           bg: "bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800",
         };
       case "inspection":
         return {
-          label: "Inspekcija",
+          label: cs.catBadges.inspection,
           bg: "bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800",
         };
       case "freelance_consulting":
         return {
-          label: "Freelance sati",
+          label: cs.catBadges.freelance_consulting,
           bg: "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
         };
       case "shift":
         return {
-          label: "Smena",
+          label: cs.catBadges.shift,
           bg: "bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800",
         };
       default:
         return {
-          label: "Obaveza",
+          label: cs.catBadges.other,
           bg: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700",
         };
     }
@@ -277,19 +283,19 @@ export const CalendarAndShiftsView = () => {
     switch (priority) {
       case "urgent":
         return {
-          label: "HITAN ZAKONSKI ROK",
+          label: cs.prioBadges.urgent,
           bg: "bg-rose-600 text-white animate-pulse",
         };
       case "high":
-        return { label: "Visok prioritet", bg: "bg-amber-500 text-white" };
+        return { label: cs.prioBadges.high, bg: "bg-amber-500 text-white" };
       case "normal":
         return {
-          label: "Redovan",
+          label: cs.prioBadges.normal,
           bg: "bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300",
         };
       case "low":
         return {
-          label: "Nizak",
+          label: cs.prioBadges.low,
           bg: "bg-slate-100 dark:bg-slate-800 text-slate-500",
         };
     }
@@ -320,17 +326,14 @@ export const CalendarAndShiftsView = () => {
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Servis Evidencije Smena, Freelance Klijenata i Poslovnih
-                  Obaveza
+                  {cs.title}
                 </h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  Knjigovodstveno-uslužni centar
+                  {cs.badge}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Centralizovano praćenje turnusa radnika klijentskih preduzeća,
-                freelance honorara, poslovnih pregovora, poreskih rokova
-                (ePorezi) i medicine rada (čl. 62 ZOR)
+                {cs.subtitle}
               </p>
             </div>
           </div>
@@ -340,10 +343,10 @@ export const CalendarAndShiftsView = () => {
             <button
               onClick={() => setCurrentTab("bank-orders")}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
-              title="Automatska izrada virmana za banku na osnovu obračunate satnice"
+              title={cs.bankOrdersBtn}
             >
               <Landmark className="w-4 h-4" />
-              <span>🏦 Nalozi za Banku (Virmani)</span>
+              <span>{cs.bankOrdersBtn}</span>
             </button>
 
             <button
@@ -351,16 +354,16 @@ export const CalendarAndShiftsView = () => {
               className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Zakaži Sastanak / Obavezu</span>
+              <span>{cs.scheduleEventBtn}</span>
             </button>
 
             <button
               onClick={() => setIsRosterModalOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
-              title="Automatski generiši standardno 8h radno vreme ili 12h turnus"
+              title={cs.rosterGenBtn}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Generator Smena (8h / 12h)</span>
+              <span>{cs.rosterGenBtn}</span>
             </button>
 
             <button
@@ -368,7 +371,7 @@ export const CalendarAndShiftsView = () => {
               className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             >
               <Clock className="w-3.5 h-3.5 text-sky-500" />
-              <span>Pojedinačna Smena</span>
+              <span>{cs.singleShiftBtn}</span>
             </button>
           </div>
         </div>
@@ -377,65 +380,65 @@ export const CalendarAndShiftsView = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
             <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
-              <span>Preduzeća u turnusu</span>
+              <span>{cs.kpiCorpTitle}</span>
               <Building className="w-3.5 h-3.5 text-indigo-500" />
             </div>
             <div className="mt-1 text-lg font-black text-slate-900 dark:text-white">
               {summaryStats.corporateClients}{" "}
               <span className="text-xs font-normal text-slate-400">
-                firmi ({employees.length} radnika)
+                {interpolate(cs.kpiCorpSub, { count: employees.length })}
               </span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
             <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
-              <span>Freelance klijenti</span>
+              <span>{cs.kpiFreelanceTitle}</span>
               <Laptop className="w-3.5 h-3.5 text-emerald-500" />
             </div>
             <div className="mt-1 text-lg font-black text-emerald-600 dark:text-emerald-400">
               {summaryStats.freelanceClients}{" "}
               <span className="text-xs font-normal text-slate-400">
-                paušalaca/IT
+                {cs.kpiFreelanceSub}
               </span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
             <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
-              <span>Poreski rokovi (ePorezi)</span>
+              <span>{cs.kpiTaxTitle}</span>
               <Landmark className="w-3.5 h-3.5 text-rose-500" />
             </div>
             <div className="mt-1 text-lg font-black text-rose-600 dark:text-rose-400">
               {summaryStats.taxDeadlines}{" "}
               <span className="text-xs font-normal text-slate-400">
-                aktivnih
+                {cs.kpiTaxSub}
               </span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
             <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
-              <span>Medicina rada (čl. 62)</span>
+              <span>{cs.kpiMedTitle}</span>
               <Stethoscope className="w-3.5 h-3.5 text-purple-500" />
             </div>
             <div className="mt-1 text-lg font-black text-purple-600 dark:text-purple-400">
               {summaryStats.medicalBZR}{" "}
               <span className="text-xs font-normal text-slate-400">
-                pregleda
+                {cs.kpiMedSub}
               </span>
             </div>
           </div>
 
           <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/50">
             <div className="flex items-center justify-between text-slate-500 text-[11px] font-medium">
-              <span>Sastanci i pregovori</span>
+              <span>{cs.kpiMeetTitle}</span>
               <Briefcase className="w-3.5 h-3.5 text-blue-500" />
             </div>
             <div className="mt-1 text-lg font-black text-blue-600 dark:text-blue-400">
               {summaryStats.upcomingMeetings}{" "}
               <span className="text-xs font-normal text-slate-400">
-                zakazano
+                {cs.kpiMeetSub}
               </span>
             </div>
           </div>
@@ -450,28 +453,28 @@ export const CalendarAndShiftsView = () => {
             onClick={() => setClientTypeFilter("all")}
             className={`px-3 py-1.5 rounded-lg transition-all ${clientTypeFilter === "all" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
-            Svi Klijenti ({companies.length})
+            {interpolate(cs.filterAllClients, { count: companies.length })}
           </button>
           <button
             onClick={() => setClientTypeFilter("company")}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${clientTypeFilter === "company" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             <Building className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Preduzeća (Smenski Rad)</span>
+            <span>{cs.filterCompanies}</span>
           </button>
           <button
             onClick={() => setClientTypeFilter("freelancer")}
             className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${clientTypeFilter === "freelancer" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             <Laptop className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Freelance & Konsultanti</span>
+            <span>{cs.filterFreelancers}</span>
           </button>
         </div>
 
         {/* Client Dropdown Selector */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs w-full sm:w-auto">
-            <span className="text-slate-400 font-medium">Aktivni klijent:</span>
+            <span className="text-slate-400 font-medium">{cs.activeClientLabel}</span>
             <select
               value={activeCompany?.id || ""}
               onChange={(e) =>
@@ -500,7 +503,7 @@ export const CalendarAndShiftsView = () => {
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${viewMode === "calendar" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>Objedinjeni Kalendar & Agenda</span>
+            <span>{cs.tabCalAgenda}</span>
           </button>
 
           <button
@@ -508,7 +511,7 @@ export const CalendarAndShiftsView = () => {
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${viewMode === "roster-grid" ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Turnusi Radnika (12h Matrica)</span>
+            <span>{cs.tabRosterGrid}</span>
           </button>
 
           <button
@@ -516,7 +519,7 @@ export const CalendarAndShiftsView = () => {
             className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg transition-all ${viewMode === "freelance-ledger" ? "bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-xs" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
           >
             <Laptop className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Freelance Klijenti & Honorari</span>
+            <span>{cs.tabFreelance}</span>
           </button>
 
           <button
@@ -525,7 +528,7 @@ export const CalendarAndShiftsView = () => {
           >
             <FileText className="w-3.5 h-3.5" />
             <span>
-              Sastanci, Pregovori i Poreski Rokovi ({filteredEvents.length})
+              {interpolate(cs.tabAgendaList, { count: filteredEvents.length })}
             </span>
           </button>
         </div>
@@ -548,10 +551,7 @@ export const CalendarAndShiftsView = () => {
           </button>
 
           <span className="text-xs font-black uppercase text-slate-900 dark:text-white min-w-[130px] text-center">
-            {currentCalendarDate.toLocaleString("sr-RS", {
-              month: "long",
-              year: "numeric",
-            })}
+            {formatMonthYear(currentCalendarDate)}
           </span>
 
           <button
@@ -578,17 +578,17 @@ export const CalendarAndShiftsView = () => {
           <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 gap-2">
               <div className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                Prikaz rasporeda smena radnika, godišnjih odmora i bolovanja
+                {cs.calPromptHint}
               </div>
               <div className="flex flex-wrap items-center gap-2.5 text-[10px] text-slate-500">
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-indigo-500" /> Smena
+                  <span className="w-2 h-2 rounded-full bg-indigo-500" /> {cs.legendShift}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Godišnji odmor (100%)
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> {cs.legendVacation}
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" /> Bolovanje (65%)
+                  <span className="w-2 h-2 rounded-full bg-rose-500" /> {cs.legendSick}
                 </span>
                 <button
                   type="button"
@@ -596,20 +596,21 @@ export const CalendarAndShiftsView = () => {
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
                 >
                   <Palmtree className="w-3 h-3" />
-                  <span>+ Unos odmora / bolovanja</span>
+                  <span>{cs.addLeaveShortBtn}</span>
                 </button>
               </div>
             </div>
 
             {/* Days of week header */}
             <div className="grid grid-cols-7 gap-1 text-center font-bold text-[11px] text-slate-400 uppercase py-1">
-              <div>Pon</div>
-              <div>Uto</div>
-              <div>Sre</div>
-              <div>Čet</div>
-              <div>Pet</div>
-              <div className="text-rose-500">Sub</div>
-              <div className="text-rose-500">Ned</div>
+              {[1, 2, 3, 4, 5, 6, 0].map((dayIdx) => (
+                <div
+                  key={dayIdx}
+                  className={dayIdx === 0 || dayIdx === 6 ? "text-rose-500" : ""}
+                >
+                  {getWeekdayName(dayIdx, true)}
+                </div>
+              ))}
             </div>
 
             {/* Calendar Days Matrix */}
@@ -646,12 +647,16 @@ export const CalendarAndShiftsView = () => {
                       <div className="flex items-center gap-1">
                         {dayLeaves.length > 0 && (
                           <span className="px-1 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[8px] font-bold">
-                            {dayLeaves.length} ods.
+                            {interpolate(cs.leaveCountBadge, {
+                              count: dayLeaves.length,
+                            })}
                           </span>
                         )}
                         {dayShifts.length > 0 && (
                           <span className="px-1.5 py-0.2 rounded-md bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[9px] font-mono font-bold">
-                            {dayShifts.length} sm.
+                            {interpolate(cs.shiftCountBadge, {
+                              count: dayShifts.length,
+                            })}
                           </span>
                         )}
                       </div>
@@ -674,7 +679,7 @@ export const CalendarAndShiftsView = () => {
                         return (
                           <div
                             key={`leave-${emp.id}-${item.dateStr}`}
-                            title={`${override.label}: ${emp.ime} (${override.doznakaBroj || override.notes || "Odsustvo"})`}
+                            title={`${override.label}: ${emp.ime} (${override.doznakaBroj || override.notes || cs.legendCodes.GO_short})`}
                             className={`px-1 py-0.5 rounded text-[8.5px] font-bold truncate flex items-center gap-1 border ${bg}`}
                           >
                             <span>{isVacation ? "🏖️" : "🩹"}</span>
@@ -700,7 +705,9 @@ export const CalendarAndShiftsView = () => {
                       })}
                       {dayEvents.length > 2 && (
                         <div className="text-[8px] text-slate-500 font-mono font-bold pl-1">
-                          +{dayEvents.length - 2} još
+                          {interpolate(cs.moreEventsBadge, {
+                            count: dayEvents.length - 2,
+                          })}
                         </div>
                       )}
                     </div>
@@ -709,7 +716,7 @@ export const CalendarAndShiftsView = () => {
                     <div className="w-full flex items-center justify-between pt-0.5">
                       {dayEvents.some((e) => e.priority === "urgent") && (
                         <span className="flex items-center gap-0.5 text-[8px] text-rose-600 dark:text-rose-400 font-bold uppercase">
-                          <AlertTriangle className="w-2.5 h-2.5" /> Hitno
+                          <AlertTriangle className="w-2.5 h-2.5" /> {cs.urgentBadge}
                         </span>
                       )}
                     </div>
@@ -726,14 +733,12 @@ export const CalendarAndShiftsView = () => {
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div>
                   <div className="text-xs uppercase font-mono text-slate-400 font-bold">
-                    Dnevna agenda klijenta
+                    {cs.dayAgendaLabel}
                   </div>
                   <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    {new Date(selectedDate).toLocaleDateString("sr-RS", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
+                    {formatDate(selectedDate, {
+                      includeDayOfWeek: true,
+                      short: false,
                     })}
                   </h3>
                 </div>
@@ -742,7 +747,7 @@ export const CalendarAndShiftsView = () => {
                     handleOpenNewEventModal("meeting", selectedDate)
                   }
                   className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors cursor-pointer"
-                  title="Dodaj novu obavezu za ovaj datum"
+                  title={cs.addEventTooltip}
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -756,20 +761,23 @@ export const CalendarAndShiftsView = () => {
                     <div className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <Palmtree className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Odsustva Radnika ({selectedDateLeaves.length})</span>
+                        <span>
+                          {interpolate(cs.workerAbsencesHeading, {
+                            count: selectedDateLeaves.length,
+                          })}
+                        </span>
                       </span>
                       <button
                         type="button"
                         onClick={() => openLeaveModal("", selectedDate)}
                         className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-0.5 cursor-pointer"
                       >
-                        <Plus className="w-3 h-3" /> Dodaj
+                        <Plus className="w-3 h-3" /> {cs.addBtn}
                       </button>
                     </div>
 
                     {selectedDateLeaves.map(({ emp, override }) => {
                       const isVacation = override.code === "GO";
-                      const isSick = ["B", "B100", "RFZO"].includes(override.code);
                       return (
                         <div
                           key={`drawer-leave-${emp.id}-${selectedDate}`}
@@ -798,13 +806,13 @@ export const CalendarAndShiftsView = () => {
 
                           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
                             <div>
-                              Broj akta:{" "}
+                              {cs.docNumPrefix}{" "}
                               <strong className="text-slate-900 dark:text-white">
-                                {override.doznakaBroj || "Nije uneto"}
+                                {override.doznakaBroj || cs.notEntered}
                               </strong>
                             </div>
                             <div>
-                              Fond:{" "}
+                              {cs.hoursFundPrefix}{" "}
                               <strong className="text-indigo-600 dark:text-indigo-400">
                                 {override.vacationHours || override.sickHours || 8}h
                               </strong>
@@ -829,7 +837,7 @@ export const CalendarAndShiftsView = () => {
                               }
                               className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
                             >
-                              <Edit2 className="w-3 h-3" /> Izmeni
+                              <Edit2 className="w-3 h-3" /> {cs.editBtn}
                             </button>
                             <button
                               type="button"
@@ -838,7 +846,7 @@ export const CalendarAndShiftsView = () => {
                               }
                               className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline flex items-center gap-1 cursor-pointer"
                             >
-                              <Trash2 className="w-3 h-3" /> Ukloni
+                              <Trash2 className="w-3 h-3" /> {cs.removeBtn}
                             </button>
                           </div>
                         </div>
@@ -853,7 +861,9 @@ export const CalendarAndShiftsView = () => {
                     <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-indigo-500" />
                       <span>
-                        Evidentirane Smene Radnika ({selectedDateShifts.length})
+                        {interpolate(cs.workerShiftsHeading, {
+                          count: selectedDateShifts.length,
+                        })}
                       </span>
                     </div>
 
@@ -879,18 +889,18 @@ export const CalendarAndShiftsView = () => {
                             </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white">
-                                {shift.location || "Smena radnika"}
+                                {shift.location || cs.workerShiftDefault}
                               </div>
                               <div className="text-[11px] font-mono text-slate-500">
                                 {shift.startTime} – {shift.endTime}{" "}
-                                {shift.crossesMidnight && "(+1 dan)"}
+                                {shift.crossesMidnight && cs.nextDayTag}
                               </div>
                             </div>
                           </div>
 
                           {isNight && (
                             <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 font-mono text-[10px] font-bold">
-                              +26% noćni
+                              {cs.nightBonusTag}
                             </span>
                           )}
                         </div>
@@ -904,7 +914,9 @@ export const CalendarAndShiftsView = () => {
                   <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                     <Briefcase className="w-3.5 h-3.5 text-blue-500" />
                     <span>
-                      Poslovne Obaveze & Sastanci ({selectedDateEvents.length})
+                      {interpolate(cs.businessEventsHeading, {
+                        count: selectedDateEvents.length,
+                      })}
                     </span>
                   </div>
 
@@ -913,8 +925,7 @@ export const CalendarAndShiftsView = () => {
                     <div className="p-6 text-center rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-dashed border-slate-200 dark:border-slate-800">
                       <CalendarIcon className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
                       <p className="text-xs font-medium text-slate-500">
-                        Nema zakazanih smena ili profesionalnih obaveza za ovaj
-                        dan.
+                        {cs.noItemsDay}
                       </p>
                       <button
                         onClick={() =>
@@ -922,7 +933,7 @@ export const CalendarAndShiftsView = () => {
                         }
                         className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-xs hover:bg-indigo-500 cursor-pointer"
                       >
-                        <Plus className="w-3.5 h-3.5" /> Zakaži obavezu
+                        <Plus className="w-3.5 h-3.5" /> {cs.scheduleDutyBtn}
                       </button>
                     </div>
                   ) : (
@@ -958,8 +969,8 @@ export const CalendarAndShiftsView = () => {
                                 className={`p-1 rounded-md transition-colors cursor-pointer ${isCompleted ? "text-emerald-500 bg-emerald-50 dark:bg-emerald-950" : "text-slate-400 hover:text-slate-600"}`}
                                 title={
                                   isCompleted
-                                    ? "Ozna\u010Di kao nezavr\u0161eno"
-                                    : "Ozna\u010Di kao obavljeno"
+                                    ? cs.markPendingTitle
+                                    : cs.markDoneTitle
                                 }
                               >
                                 <Check className="w-3.5 h-3.5" />
@@ -967,14 +978,14 @@ export const CalendarAndShiftsView = () => {
                               <button
                                 onClick={() => handleEditEvent(ev)}
                                 className="p-1 rounded-md text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer"
-                                title="Izmeni"
+                                title={cs.editBtn}
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => deleteProfessionalEvent(ev.id)}
                                 className="p-1 rounded-md text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                                title="Obriši"
+                                title={cs.removeBtn}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1042,7 +1053,7 @@ export const CalendarAndShiftsView = () => {
             {/* Quick Action bar at bottom of drawer */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
               <span className="text-slate-400 font-mono text-[11px]">
-                Izabrani datum: <strong>{selectedDate}</strong>
+                {cs.selectedDateLabel} <strong>{selectedDate}</strong>
               </span>
               <button
                 onClick={() =>
@@ -1051,7 +1062,7 @@ export const CalendarAndShiftsView = () => {
                 className="text-purple-600 dark:text-purple-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Stethoscope className="w-3.5 h-3.5" />
-                <span>+ Medicina rada</span>
+                <span>{cs.addMedicalBtn}</span>
               </button>
             </div>
           </div>
@@ -1066,14 +1077,13 @@ export const CalendarAndShiftsView = () => {
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Evidencija smena i radnog vremena:{" "}
-                  {currentClient?.naziv || "Sve firme"}
+                  {interpolate(cs.rosterHeading, {
+                    name: currentClient?.naziv || cs.allFirmsFallback,
+                  })}
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Pojedinačni radnici u istoj firmi mogu imati različite smenske
-                režime (8h redovno, 8h trosemenski, 12h turnus). Kliknite na
-                bilo koje polje za <strong>manuelnu prepravku smene</strong>.
+                {cs.rosterSub}
               </p>
             </div>
 
@@ -1085,7 +1095,7 @@ export const CalendarAndShiftsView = () => {
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
               >
                 <Palmtree className="w-4 h-4" />
-                <span>+ Unos bolovanja / odmora</span>
+                <span>{cs.addLeaveBtn}</span>
               </button>
 
               <button
@@ -1094,15 +1104,13 @@ export const CalendarAndShiftsView = () => {
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ Dodaj smenu radniku</span>
+                <span>{cs.addShiftBtn}</span>
               </button>
 
               {/* Statutory Compliance Badge */}
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-50 dark:bg-purple-950/70 border border-purple-200 dark:border-purple-800 text-purple-800 dark:text-purple-200 text-xs">
                 <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0" />
-                <span>
-                  <strong>Član 51, 62, 114 & 115 ZOR:</strong> Fond sati, naknade za bolovanje (65%) i godišnji odmor (100%)
-                </span>
+                <span>{cs.compliancePill}</span>
               </div>
             </div>
           </div>
@@ -1113,31 +1121,31 @@ export const CalendarAndShiftsView = () => {
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase">
                   <th className="p-3 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10 w-60 font-sans font-bold">
-                    Zaposleni / Dodeljeni režim rada
+                    {cs.workerRegimeCol}
                   </th>
                   {daysInCurrentMonthForRoster.map((d) => (
                     <th
                       key={d.day}
-                      className={`p-1 text-center w-7 border-l border-slate-200 dark:border-slate-800 ${d.dayOfWeek === "Sub" || d.dayOfWeek === "Ned" ? "bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 font-bold" : ""}`}
+                      className={`p-1 text-center w-7 border-l border-slate-200 dark:border-slate-800 ${d.isWeekend ? "bg-rose-50/50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 font-bold" : ""}`}
                     >
                       <div>{d.day}</div>
                       <div className="text-[8px] font-sans">{d.dayOfWeek}</div>
                     </th>
                   ))}
                   <th className="p-2 text-right font-sans font-bold w-14 text-slate-700 dark:text-slate-300">
-                    Redovan
+                    {cs.colRegular}
                   </th>
                   <th className="p-2 text-right font-sans font-bold w-14 text-emerald-600 dark:text-emerald-400">
-                    GO (100%)
+                    {cs.colVac}
                   </th>
                   <th className="p-2 text-right font-sans font-bold w-14 text-rose-600 dark:text-rose-400">
-                    Bolov. (65%)
+                    {cs.colSick}
                   </th>
                   <th className="p-2 text-right font-sans font-bold w-14 text-indigo-600 dark:text-indigo-400">
-                    Noćni
+                    {cs.colNight}
                   </th>
                   <th className="p-2 text-right font-sans font-bold w-16">
-                    Ukupno
+                    {cs.colTotal}
                   </th>
                 </tr>
               </thead>
@@ -1182,25 +1190,25 @@ export const CalendarAndShiftsView = () => {
                               updateWorkerRegime(emp.id, e.target.value)
                             }
                             className="w-full text-[10px] font-bold py-1 px-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer outline-none hover:border-indigo-400"
-                            title="Kliknite za promenu smenskog režima ovog radnika"
+                            title={cs.regimeTooltip}
                           >
                             <option value="8h_regular">
-                              🕒 8h Redovno (08-16)
+                              🕒 {t.ui.calShifts.regimes["8h_regular"]}
                             </option>
                             <option value="8h_three_shift">
-                              🔄 8h Trosemenski (I/II/III)
+                              🔄 {t.ui.calShifts.regimes["8h_three_shift"]}
                             </option>
                             <option value="8h_two_shift">
-                              ⛅ 8h Dvosmenski (I/II)
+                              ⛅ {t.ui.calShifts.regimes["8h_two_shift"]}
                             </option>
                             <option value="12h_turnus">
-                              ⏳ 12h Turnus (D-N-O-O)
+                              ⏳ {t.ui.calShifts.regimes["12h_turnus"]}
                             </option>
                             <option value="12h_continuous">
-                              ⚡ 12h Kontinualni (2D-2N-4O)
+                              ⚡ {t.ui.calShifts.regimes["12h_continuous"]}
                             </option>
                             <option value="custom_flexible">
-                              📌 Prilagođeno / Fleksibilno
+                              📌 {t.ui.calShifts.regimes["custom_flexible"]}
                             </option>
                           </select>
                         </div>
@@ -1209,7 +1217,7 @@ export const CalendarAndShiftsView = () => {
                         {isNightJob && (
                           <div className="mt-1 flex items-center gap-1 text-[9px] text-purple-600 dark:text-purple-400">
                             <Stethoscope className="w-2.5 h-2.5 shrink-0" />
-                            <span>Lekarsko uverenje važi (čl. 62)</span>
+                            <span>{cs.medicalValidBadge}</span>
                           </div>
                         )}
                       </td>
@@ -1217,8 +1225,7 @@ export const CalendarAndShiftsView = () => {
                         let cellContent = "\u2014";
                         let cellBg = "text-slate-300 dark:text-slate-600";
                         let isOverridden = false;
-                        const isWeekend =
-                          d.dayOfWeek === "Sub" || d.dayOfWeek === "Ned";
+                        const isWeekend = d.isWeekend;
                         const override = emp.manualOverrides?.[d.dateStr];
                         if (override) {
                           isOverridden = true;
@@ -1412,8 +1419,24 @@ export const CalendarAndShiftsView = () => {
                               }
                               title={
                                 isOverridden
-                                  ? `Manuelna izmena: ${override?.label} ${override?.doznakaBroj ? `(Dokument: ${override.doznakaBroj})` : ""} ${override?.notes ? `("${override.notes}")` : ""} - Klikni za izmenu/brisanje`
-                                  : `Smena: ${cellContent} (${d.dayOfWeek}, ${d.day}. ${currentCalendarDate.toLocaleString("sr-RS", { month: "short" })}) - Klikni za manuelnu prepravku`
+                                  ? interpolate(cs.overrideTooltipEdit, {
+                                      label: override?.label || "",
+                                      doc: override?.doznakaBroj
+                                        ? `(${override.doznakaBroj})`
+                                        : "",
+                                      notes: override?.notes
+                                        ? `("${override.notes}")`
+                                        : "",
+                                    })
+                                  : interpolate(cs.overrideTooltipNew, {
+                                      code: cellContent,
+                                      weekday: d.dayOfWeekShort,
+                                      day: d.day,
+                                      month: currentCalendarDate.toLocaleString(
+                                        intlLocale,
+                                        { month: "short" },
+                                      ),
+                                    })
                               }
                               className={`inline-block w-6 h-6 leading-6 rounded text-[10px] transition-transform hover:scale-110 cursor-pointer relative ${cellBg} ${isOverridden ? "ring-2 ring-indigo-500 font-black shadow-xs" : ""}`}
                             >
@@ -1452,51 +1475,51 @@ export const CalendarAndShiftsView = () => {
             <div className="flex flex-wrap items-center gap-3">
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-200 dark:bg-emerald-900" />
-                <strong>GO</strong> Godišnji odmor (100%)
+                <strong>GO</strong> {cs.legendCodes.GO_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-rose-200 dark:bg-rose-900" />
-                <strong>B</strong> Bolovanje do 30d (65%)
+                <strong>B</strong> {cs.legendCodes.B_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-blue-200 dark:bg-blue-900" />
-                <strong>R</strong> 8h Redovno
+                <strong>R</strong> {cs.legendCodes.R_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-amber-200 dark:bg-amber-900" />
-                <strong>I</strong> 8h Jutarnja
+                <strong>I</strong> {cs.legendCodes.I_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-orange-200 dark:bg-orange-900" />
-                <strong>II</strong> 8h Popodnevna
+                <strong>II</strong> {cs.legendCodes.II_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-indigo-200 dark:bg-indigo-900" />
-                <strong>III</strong> 8h Noćna (+26%)
+                <strong>III</strong> {cs.legendCodes.III_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-yellow-200 dark:bg-yellow-900" />
-                <strong>D</strong> 12h Dan
+                <strong>D</strong> {cs.legendCodes.D_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-purple-200 dark:bg-purple-900" />
-                <strong>N</strong> 12h Noć (+26%)
+                <strong>N</strong> {cs.legendCodes.N_full}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-emerald-200 dark:bg-emerald-900" />
-                <strong>GO</strong> Odmor
+                <strong>GO</strong> {cs.legendCodes.GO_short}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-rose-200 dark:bg-rose-900" />
-                <strong>B</strong> Bolovanje
+                <strong>B</strong> {cs.legendCodes.B_short}
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-red-200 dark:bg-red-900" />
-                <strong>P</strong> Prekovremeno
+                <strong>P</strong> {cs.legendCodes.P_short}
               </span>
               <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold">
                 <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                Manuelna izmena
+                {cs.legendManual}
               </span>
             </div>
 
@@ -1507,7 +1530,7 @@ export const CalendarAndShiftsView = () => {
                 className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Dodaj smenu radniku</span>
+                <span>{cs.footerAddShift}</span>
               </button>
 
               <button
@@ -1516,7 +1539,7 @@ export const CalendarAndShiftsView = () => {
                 className="flex items-center gap-1 text-purple-600 dark:text-purple-400 font-bold hover:underline cursor-pointer ml-3"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Zakaži periodični lekarski pregled</span>
+                <span>{cs.footerScheduleMed}</span>
               </button>
             </div>
           </div>
@@ -1531,13 +1554,11 @@ export const CalendarAndShiftsView = () => {
               <div className="flex items-center gap-2">
                 <Laptop className="w-5 h-5 text-emerald-500" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Knjigovodstveno Praćenje Freelance Klijenata & Konsultanata
+                  {cs.freelanceTitle}
                 </h3>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Evidencija ugovorenih konsultantskih sati, fakturisanja
-                inostranim klijentima, limita paušala (6M RSD) i poreskih
-                prijava (PP OPO-K)
+                {cs.freelanceSub}
               </p>
             </div>
 
@@ -1546,7 +1567,7 @@ export const CalendarAndShiftsView = () => {
               className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Evidentiraj Konsultantske Sate / Fakturu</span>
+              <span>{cs.freelanceBtn}</span>
             </button>
           </div>
 
@@ -1577,8 +1598,8 @@ export const CalendarAndShiftsView = () => {
                         </div>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                           {fc.poreskiModel === "pausal"
-                            ? "Pau\u0161alac (KPO)"
-                            : fc.poreskiModel || "Freelance"}
+                            ? cs.pausalBadge
+                            : fc.poreskiModel || cs.freelanceBadge}
                         </span>
                       </div>
 
@@ -1587,7 +1608,7 @@ export const CalendarAndShiftsView = () => {
                           {fc.naziv}
                         </h4>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {fc.kontaktOsoba || "Samostalni konsultant"} • PIB:{" "}
+                          {fc.kontaktOsoba || cs.selfEmployedFallback} • PIB:{" "}
                           <strong className="font-mono">{fc.pib}</strong>
                         </p>
                       </div>
@@ -1596,17 +1617,17 @@ export const CalendarAndShiftsView = () => {
                       <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500">
-                            Ugovorena satnica:
+                            {cs.agreedRateLabel}
                           </span>
                           <span className="font-mono font-bold text-slate-900 dark:text-white">
                             {fc.satnicaUgovorena
                               ? `${fc.satnicaUgovorena} ${fc.valuta || "EUR"}/h`
-                              : "Nije definisana"}
+                              : cs.undefinedLabel}
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500">
-                            Fakturisano ovog meseca:
+                            {cs.billedMonthLabel}
                           </span>
                           <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
                             {totalBilled > 0
@@ -1616,10 +1637,10 @@ export const CalendarAndShiftsView = () => {
                         </div>
                         <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                           <span className="text-slate-400">
-                            Limit paušala (6M RSD):
+                            {cs.pausalLimitLabel}
                           </span>
                           <span className="text-indigo-600 dark:text-indigo-400 font-mono font-bold">
-                            U okviru limita
+                            {cs.withinLimit}
                           </span>
                         </div>
                       </div>
@@ -1627,7 +1648,9 @@ export const CalendarAndShiftsView = () => {
                       {/* Associated events for this freelancer */}
                       <div className="space-y-1.5">
                         <div className="text-[11px] font-bold text-slate-400 uppercase">
-                          Aktivnosti & Rokovi ({clientEvents.length})
+                          {interpolate(cs.activitiesLabel, {
+                            count: clientEvents.length,
+                          })}
                         </div>
                         {clientEvents.slice(0, 2).map((ev) => (
                           <div
@@ -1656,16 +1679,16 @@ export const CalendarAndShiftsView = () => {
                         }
                         className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs text-center transition-colors cursor-pointer"
                       >
-                        + Obračun sati
+                        {cs.billHoursBtn}
                       </button>
                       <button
                         onClick={() =>
                           handleOpenNewEventModal("meeting", selectedDate)
                         }
                         className="py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors cursor-pointer"
-                        title="Zakaži poresko savetovanje"
+                        title={cs.meetingBtnTitle}
                       >
-                        Sastanak
+                        {cs.meetingBtn}
                       </button>
                     </div>
                   </div>
@@ -1687,7 +1710,7 @@ export const CalendarAndShiftsView = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Pretraži po nazivu, klijentu, radniku ili oznaci..."
+                placeholder={cs.searchAgendaPh}
                 className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs outline-none text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -1699,15 +1722,13 @@ export const CalendarAndShiftsView = () => {
                 onChange={(e) => setSelectedCategoryFilter(e.target.value)}
                 className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
               >
-                <option value="all">Sve kategorije obaveza</option>
-                <option value="meeting">🤝 Poslovni sastanci</option>
-                <option value="negotiation">💼 Poslovni pregovori</option>
-                <option value="tax_deadline">
-                  🏛️ Poreski rokovi (ePorezi)
-                </option>
-                <option value="medical_bzr">🩺 Medicina rada & BZR</option>
-                <option value="inspection">🔍 Inspekcija rada</option>
-                <option value="freelance_consulting">💻 Freelance sati</option>
+                <option value="all">{cs.catAll}</option>
+                <option value="meeting">🤝 {cs.catMeeting}</option>
+                <option value="negotiation">💼 {cs.catNegotiation}</option>
+                <option value="tax_deadline">🏛️ {cs.catTax}</option>
+                <option value="medical_bzr">🩺 {cs.catMed}</option>
+                <option value="inspection">🔍 {cs.catInspect}</option>
+                <option value="freelance_consulting">💻 {cs.catFreelance}</option>
               </select>
 
               <select
@@ -1715,9 +1736,9 @@ export const CalendarAndShiftsView = () => {
                 onChange={(e) => setSelectedStatusFilter(e.target.value)}
                 className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 outline-none"
               >
-                <option value="all">Svi statusi</option>
-                <option value="scheduled">📅 Zakazano</option>
-                <option value="completed">✅ Obavljeno</option>
+                <option value="all">{cs.statusAll}</option>
+                <option value="scheduled">📅 {cs.statusScheduled}</option>
+                <option value="completed">✅ {cs.statusCompleted}</option>
               </select>
 
               <button
@@ -1725,7 +1746,7 @@ export const CalendarAndShiftsView = () => {
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Nova obaveza</span>
+                <span>{cs.newDutyBtn}</span>
               </button>
             </div>
           </div>
@@ -1734,7 +1755,7 @@ export const CalendarAndShiftsView = () => {
           <div className="space-y-3">
             {filteredEvents.length === 0 ? (
               <div className="p-10 text-center text-slate-500 text-xs">
-                Nema obaveza koje odgovaraju postavljenim filterima.
+                {cs.noAgendaMatches}
               </div>
             ) : (
               filteredEvents.map((ev) => {
@@ -1759,7 +1780,8 @@ export const CalendarAndShiftsView = () => {
                           {priorityInfo.label}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                          {ev.date} {ev.startTime ? `u ${ev.startTime}` : ""}
+                          {ev.date}{" "}
+                          {ev.startTime ? `${cs.timeAtWord} ${ev.startTime}` : ""}
                         </span>
                         {ev.financialAmount && (
                           <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
@@ -1807,14 +1829,14 @@ export const CalendarAndShiftsView = () => {
                       >
                         <Check className="w-3.5 h-3.5" />
                         <span>
-                          {isCompleted ? "Obavljeno" : "Ozna\u010Di obavljeno"}
+                          {isCompleted ? cs.completedBtn : cs.markCompletedBtn}
                         </span>
                       </button>
 
                       <button
                         onClick={() => handleEditEvent(ev)}
                         className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-                        title="Izmeni"
+                        title={cs.editBtn}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
@@ -1822,7 +1844,7 @@ export const CalendarAndShiftsView = () => {
                       <button
                         onClick={() => deleteProfessionalEvent(ev.id)}
                         className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950 transition-colors cursor-pointer"
-                        title="Obriši"
+                        title={cs.removeBtn}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1850,7 +1872,7 @@ export const CalendarAndShiftsView = () => {
         <WorkerCalendarOverrideModal
           employee={overrideModalData.employee}
           date={overrideModalData.date}
-          companyName={currentClient?.naziv || "Preduze\u0107e"}
+          companyName={currentClient?.naziv || cs.fallbackCompany}
           existingOverride={overrideModalData.existingOverride}
           onClose={() => setOverrideModalData(null)}
           onSave={(override) => {

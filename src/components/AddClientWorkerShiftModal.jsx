@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from "react";
-import { X, ShieldCheck, Plus, Check } from "lucide-react";
+import { X, ShieldCheck, Plus, Check, AlertCircle } from "lucide-react";
 import { useShift } from "../context/ShiftContext";
+import { useLanguage } from "../i18n/LanguageContext";
+
 export const AddClientWorkerShiftModal = ({
   isOpen,
   onClose,
@@ -16,15 +18,19 @@ export const AddClientWorkerShiftModal = ({
     addShift,
     selectedDate,
   } = useShift();
+  const { t } = useLanguage();
+
   const [companyId, setCompanyId] = useState(
     initialCompanyId || activeCompany?.id || companies[0]?.id || "",
   );
   const companyWorkers = useMemo(() => {
     return employees.filter((e) => e.companyId === companyId);
   }, [employees, companyId]);
+
   const [workerId, setWorkerId] = useState(
     initialWorkerId || companyWorkers[0]?.id || "",
   );
+
   React.useEffect(() => {
     if (
       companyWorkers.length > 0 &&
@@ -33,6 +39,7 @@ export const AddClientWorkerShiftModal = ({
       setWorkerId(companyWorkers[0].id);
     }
   }, [companyId, companyWorkers, workerId]);
+
   const [date, setDate] = useState(
     initialDate ||
       selectedDate ||
@@ -46,7 +53,10 @@ export const AddClientWorkerShiftModal = ({
   const [overtimeHours, setOvertimeHours] = useState(0);
   const [notes, setNotes] = useState("");
   const [location, setLocation] = useState("");
+  const [formError, setFormError] = useState("");
+
   if (!isOpen) return null;
+
   const handleApplyPreset = (code) => {
     setShiftPreset(code);
     switch (code) {
@@ -122,10 +132,12 @@ export const AddClientWorkerShiftModal = ({
         break;
     }
   };
+
   const handleSave = (e) => {
     e.preventDefault();
+    setFormError("");
     if (!workerId) {
-      alert("Molimo izaberite radnika klijenta.");
+      setFormError(t.ui.addWorkerShiftModal.errSelectWorker);
       return;
     }
     const worker = employees.find((e2) => e2.id === workerId);
@@ -142,9 +154,9 @@ export const AddClientWorkerShiftModal = ({
       crossesMidnight,
       status: "scheduled",
       breaks: [],
-      location: location || company?.naziv || "Pogon klijenta",
-      notes: notes || `Smena dodata za radnika ${worker?.ime}`,
-      cycleDayLabel: `Smena ${shiftPreset}`,
+      location: location || company?.naziv || "",
+      notes: notes || worker?.ime || "",
+      cycleDayLabel: shiftPreset,
     });
     const override = {
       date,
@@ -162,6 +174,7 @@ export const AddClientWorkerShiftModal = ({
     updateWorkerDayOverride(workerId, date, override);
     onClose();
   };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
       <div
@@ -170,25 +183,24 @@ export const AddClientWorkerShiftModal = ({
         aria-modal="true"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-gradient-to-r from-slate-900 to-indigo-950 text-white">
+        <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-slate-900 text-white">
           <div>
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-lg bg-indigo-600/60 text-white border border-indigo-400/30">
                 <Plus className="w-4 h-4" />
               </span>
               <h3 className="font-bold text-base">
-                Dodaj smenu radniku klijenta
+                {t.ui.addWorkerShiftModal.title}
               </h3>
             </div>
-            <p className="text-xs text-indigo-200/80 mt-1">
-              Evidentirajte pojedinačnu smenu ili vanredni raspored za
-              zaposlenog izabrane firme
+            <p className="text-xs text-slate-300 mt-1">
+              {t.ui.addWorkerShiftModal.subtitle}
             </p>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -199,11 +211,18 @@ export const AddClientWorkerShiftModal = ({
           onSubmit={handleSave}
           className="p-4 sm:p-5 space-y-4 overflow-y-auto text-xs"
         >
+          {formError && (
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-semibold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           {/* Client & Worker Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Firma / Klijent:
+                {t.ui.addWorkerShiftModal.clientLabel}:
               </label>
               <select
                 value={companyId}
@@ -212,9 +231,6 @@ export const AddClientWorkerShiftModal = ({
               >
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.clientType === "freelancer"
-                      ? "\u{1F4BB} "
-                      : "\u{1F3ED} "}{" "}
                     {c.naziv}
                   </option>
                 ))}
@@ -223,11 +239,11 @@ export const AddClientWorkerShiftModal = ({
 
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Zaposleni / Radnik:
+                {t.ui.addWorkerShiftModal.employeeLabel}:
               </label>
               {companyWorkers.length === 0 ? (
                 <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs">
-                  Ova firma nema unetih radnika.
+                  {t.ui.addWorkerShiftModal.noWorkers}
                 </div>
               ) : (
                 <select
@@ -237,7 +253,7 @@ export const AddClientWorkerShiftModal = ({
                 >
                   {companyWorkers.map((w) => (
                     <option key={w.id} value={w.id}>
-                      👤 {w.ime} ({w.pozicija})
+                      {w.ime} ({w.pozicija})
                     </option>
                   ))}
                 </select>
@@ -248,7 +264,7 @@ export const AddClientWorkerShiftModal = ({
           {/* Date Picker */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-              Datum angažovanja / smene:
+              {t.ui.addWorkerShiftModal.dateLabel}:
             </label>
             <input
               type="date"
@@ -262,33 +278,27 @@ export const AddClientWorkerShiftModal = ({
           {/* Shift Preset Buttons */}
           <div>
             <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Tip smene / Šablon radnog vremena:
+              {t.ui.addWorkerShiftModal.templateLabel}:
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
-              {[
-                { code: "R", label: "R - Redovno 8h (08-16)" },
-                { code: "I", label: "I - Jutarnja 8h (06-14)" },
-                { code: "II", label: "II - Popodnevna (14-22)" },
-                { code: "III", label: "III - No\u0107na (+26%)" },
-                { code: "D", label: "D - Turnus 12h Dan" },
-                { code: "N", label: "N - Turnus 12h No\u0107 (+26%)" },
-                { code: "O", label: "O - Slobodan dan" },
-                { code: "GO", label: "GO - Godi\u0161nji odmor" },
-                { code: "B", label: "B - Bolovanje" },
-                { code: "P", label: "P - Prekovremeni" },
-              ].map((item) => (
-                <button
-                  key={item.code}
-                  type="button"
-                  onClick={() => handleApplyPreset(item.code)}
-                  className={`p-2 rounded-xl border text-left font-bold transition-all cursor-pointer ${shiftPreset === item.code ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300"}`}
-                >
-                  <div className="font-mono text-xs">{item.code}</div>
-                  <div className="text-[10px] font-normal truncate">
-                    {item.label.split(" - ")[1] || item.label}
-                  </div>
-                </button>
-              ))}
+              {["R", "I", "II", "III", "D", "N", "O", "GO", "B", "P"].map(
+                (code) => {
+                  const presetCopy = t.ui.overrideModal.presets[code] || {};
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => handleApplyPreset(code)}
+                      className={`p-2 rounded-xl border text-left font-bold transition-all cursor-pointer ${shiftPreset === code ? "bg-indigo-600 text-white border-indigo-600 shadow-sm" : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300"}`}
+                    >
+                      <div className="font-mono text-xs">{code}</div>
+                      <div className="text-[10px] font-normal truncate">
+                        {presetCopy.fullTitle || presetCopy.label || code}
+                      </div>
+                    </button>
+                  );
+                },
+              )}
             </div>
           </div>
 
@@ -296,7 +306,7 @@ export const AddClientWorkerShiftModal = ({
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                Početak
+                {t.ui.addWorkerShiftModal.startLabel}
               </label>
               <input
                 type="time"
@@ -307,7 +317,7 @@ export const AddClientWorkerShiftModal = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                Kraj
+                {t.ui.addWorkerShiftModal.endLabel}
               </label>
               <input
                 type="time"
@@ -318,7 +328,7 @@ export const AddClientWorkerShiftModal = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                Dnevni sati
+                {t.ui.addWorkerShiftModal.dayHoursLabel}
               </label>
               <input
                 type="number"
@@ -332,7 +342,7 @@ export const AddClientWorkerShiftModal = ({
             </div>
             <div>
               <label className="block text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                Noćni sati (+26%)
+                {t.ui.addWorkerShiftModal.nightHoursLabel}
               </label>
               <input
                 type="number"
@@ -350,11 +360,11 @@ export const AddClientWorkerShiftModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Lokacija / Pogon rada:
+                {t.ui.addWorkerShiftModal.worksiteLabel}:
               </label>
               <input
                 type="text"
-                placeholder="npr. Pogon Obrenovac, Linija 2..."
+                placeholder={t.ui.addWorkerShiftModal.worksitePlaceholder}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -363,11 +373,11 @@ export const AddClientWorkerShiftModal = ({
 
             <div>
               <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Napomena za raspored:
+                {t.ui.addWorkerShiftModal.noteLabel}:
               </label>
               <input
                 type="text"
-                placeholder="npr. Vanredna smena, nalog poslodavca..."
+                placeholder={t.ui.addWorkerShiftModal.notePlaceholder}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -378,10 +388,7 @@ export const AddClientWorkerShiftModal = ({
           {/* Compliance Info */}
           <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-900/60 text-[11px] text-purple-900 dark:text-purple-200 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-            <span>
-              Ova smena se automatski upisuje u dosije klijenta, kalendar i
-              mesečnu tabelu radnika sa proračunom satnice za isplatu zarade.
-            </span>
+            <span>{t.ui.addWorkerShiftModal.complianceInfo}</span>
           </div>
 
           {/* Buttons */}
@@ -391,7 +398,7 @@ export const AddClientWorkerShiftModal = ({
               onClick={onClose}
               className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold transition-colors cursor-pointer"
             >
-              Otkaži
+              {t.ui.common.cancel}
             </button>
             <button
               type="submit"
@@ -399,7 +406,7 @@ export const AddClientWorkerShiftModal = ({
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Dodaj smenu radniku</span>
+              <span>{t.ui.addWorkerShiftModal.submitBtn}</span>
             </button>
           </div>
         </form>

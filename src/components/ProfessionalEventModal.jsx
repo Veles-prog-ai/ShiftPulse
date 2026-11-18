@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useShift } from "../context/ShiftContext";
+import { useLanguage } from "../i18n/LanguageContext";
 import {
   X,
   Calendar as CalendarIcon,
@@ -28,6 +29,7 @@ export const ProfessionalEventModal = ({
     updateProfessionalEvent,
     selectedDate,
   } = useShift();
+  const { t } = useLanguage();
   const [clientId, setClientId] = useState("");
   const [category, setCategory] = useState(defaultCategory);
   const [workerName, setWorkerName] = useState("");
@@ -40,7 +42,7 @@ export const ProfessionalEventModal = ({
   );
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("11:30");
-  const [location, setLocation] = useState("Kancelarija agencije");
+  const [location, setLocation] = useState(t.ui.eventModal.locationDefault);
   const [priority, setPriority] = useState("normal");
   const [status, setStatus] = useState("scheduled");
   const [financialAmount, setFinancialAmount] = useState("");
@@ -84,7 +86,7 @@ export const ProfessionalEventModal = ({
       );
       setStartTime("10:00");
       setEndTime("11:00");
-      setLocation("Kancelarija agencije");
+      setLocation(t.ui.eventModal.locationDefault);
       setPriority("normal");
       setStatus("scheduled");
       setFinancialAmount("");
@@ -100,6 +102,7 @@ export const ProfessionalEventModal = ({
     defaultClientId,
     companies,
     selectedDate,
+    t.ui.eventModal.locationDefault,
   ]);
   if (!isOpen) return null;
   const selectedClient = companies.find((c) => c.id === clientId);
@@ -107,19 +110,13 @@ export const ProfessionalEventModal = ({
   const handleCategoryChange = (cat) => {
     setCategory(cat);
     if (cat === "medical_bzr" && !complianceNote) {
-      setComplianceNote(
-        "\u010Clan 62. Zakona o radu RS - Obavezan prethodni i periodi\u010Dni lekarski pregled za zaposlene na no\u0107nom radu (najmanje 3h u periodu 22:00-06:00).",
-      );
+      setComplianceNote(t.ui.eventModal.autoNotes.medical_bzr);
       setPriority("urgent");
     } else if (cat === "tax_deadline" && !complianceNote) {
-      setComplianceNote(
-        "Zakon o poreskom postupku i poreskoj administraciji - Obaveza podno\u0161enja PPP-PD / PP PDV u zakonskom roku.",
-      );
+      setComplianceNote(t.ui.eventModal.autoNotes.tax_deadline);
       setPriority("urgent");
     } else if (cat === "negotiation" && !complianceNote) {
-      setComplianceNote(
-        "Uskla\u0111ivanje sa Zakonom o radu i ugovorom o radu / autorskim ugovorom.",
-      );
+      setComplianceNote(t.ui.eventModal.autoNotes.negotiation);
     }
   };
   const handleSubmit = (e) => {
@@ -127,12 +124,12 @@ export const ProfessionalEventModal = ({
     if (!title.trim() || !clientId) return;
     const parsedTags = tagsInput
       .split(",")
-      .map((t) => t.trim())
+      .map((tag) => tag.trim())
       .filter(Boolean);
     const clientType = selectedClient?.clientType || "company";
     const clientName = selectedClient
       ? selectedClient.naziv
-      : "Nepoznat klijent";
+      : t.ui.common.unknownClient;
     const eventPayload = {
       clientId,
       clientName,
@@ -171,12 +168,11 @@ export const ProfessionalEventModal = ({
             <div>
               <h3 className="text-base font-black tracking-tight">
                 {eventToEdit
-                  ? "Izmena Poslovne Obaveze / Doga\u0111aja"
-                  : "Zaka\u017Ei Sastanak, Pregovore ili Poreski Rok"}
+                  ? t.ui.eventModal.editTitle
+                  : t.ui.eventModal.createTitle}
               </h3>
               <p className="text-xs text-indigo-200/80">
-                Evidencija za klijente agencije: firme, radnike u turnusu i
-                freelancere
+                {t.ui.eventModal.subtitle}
               </p>
             </div>
           </div>
@@ -195,7 +191,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <Building className="w-3.5 h-3.5 text-indigo-500" />
-                Klijent Agencije (Preduzeće ili Freelancer) *
+                {t.ui.eventModal.clientLabel} *
               </label>
               <select
                 value={clientId}
@@ -206,8 +202,8 @@ export const ProfessionalEventModal = ({
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.clientType === "freelancer"
-                      ? "\u{1F4BB} [Freelance] "
-                      : "\u{1F3ED} [Firma] "}
+                      ? `💻 ${t.ui.eventModal.tagFreelance} `
+                      : `🏭 ${t.ui.eventModal.tagCompany} `}
                     {c.naziv}
                   </option>
                 ))}
@@ -215,14 +211,9 @@ export const ProfessionalEventModal = ({
               {selectedClient && (
                 <div className="mt-1 text-[11px] text-slate-500 flex items-center gap-2">
                   <span>
-                    PIB:{" "}
+                    {t.ui.ledger.slip.pib}:{" "}
                     <strong className="font-mono">{selectedClient.pib}</strong>
                   </span>
-                  {selectedClient.poreskiModel && (
-                    <span className="px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
-                      Model: {selectedClient.poreskiModel}
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -230,7 +221,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
-                Kategorija Obaveze / Događaja *
+                {t.ui.eventModal.categoryLabel} *
               </label>
               <select
                 value={category}
@@ -238,26 +229,28 @@ export const ProfessionalEventModal = ({
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="meeting">
-                  🤝 Poslovni sastanak (menadžment / klijent)
+                  🤝 {t.ui.eventModal.categories.meeting}
                 </option>
                 <option value="negotiation">
-                  💼 Poslovni pregovori (ugovori, aneksi, satnice)
+                  💼 {t.ui.eventModal.categories.negotiation}
                 </option>
                 <option value="tax_deadline">
-                  🏛️ Poreski rok (PPP-PD, PDV, PP OPO-K, APR)
+                  🏛️ {t.ui.eventModal.categories.tax_deadline}
                 </option>
                 <option value="medical_bzr">
-                  🩺 Medicina rada & BZR (obavezni lekarski čl. 62)
+                  🩺 {t.ui.eventModal.categories.medical_bzr}
                 </option>
                 <option value="inspection">
-                  🔍 Inspekcijski nadzor (Rad, Porez)
+                  🔍 {t.ui.eventModal.categories.inspection}
                 </option>
                 <option value="freelance_consulting">
-                  💻 Freelance konsultantski sati / ino-faktura
+                  💻 {t.ui.eventModal.categories.freelance_consulting}
                 </option>
-                <option value="shift">🏭 Radna smena radnika</option>
+                <option value="shift">
+                  🏭 {t.ui.eventModal.categories.shift}
+                </option>
                 <option value="invoice_due">
-                  💳 Dospeće plaćanja / honorara
+                  💳 {t.ui.eventModal.categories.invoice_due}
                 </option>
               </select>
             </div>
@@ -267,14 +260,14 @@ export const ProfessionalEventModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                Naziv Događaja / Predmet Obaveze *
+                {t.ui.eventModal.titleLabel} *
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                placeholder="npr. Sastanak sa direktorom oko organizacije noćne smene"
+                placeholder={t.ui.eventModal.titlePlaceholder}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -282,7 +275,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-slate-400" />
-                Zaposleni / Kontakt osoba
+                {t.ui.eventModal.workerLabel}
               </label>
               {clientWorkers.length > 0 ? (
                 <input
@@ -290,7 +283,7 @@ export const ProfessionalEventModal = ({
                   list="client-workers-list"
                   value={workerName}
                   onChange={(e) => setWorkerName(e.target.value)}
-                  placeholder="Izaberi ili upiši lice"
+                  placeholder={t.ui.eventModal.workerPlaceholder}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               ) : (
@@ -298,7 +291,10 @@ export const ProfessionalEventModal = ({
                   type="text"
                   value={workerName}
                   onChange={(e) => setWorkerName(e.target.value)}
-                  placeholder={selectedClient?.kontaktOsoba || "Ime lica"}
+                  placeholder={
+                    selectedClient?.kontaktOsoba ||
+                    t.ui.eventModal.workerPlaceholder
+                  }
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               )}
@@ -318,7 +314,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
-                Datum *
+                {t.ui.eventModal.dateLabel} *
               </label>
               <input
                 type="date"
@@ -332,7 +328,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                Od
+                {t.ui.eventModal.fromLabel}
               </label>
               <input
                 type="time"
@@ -345,7 +341,7 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                Do
+                {t.ui.eventModal.toLabel}
               </label>
               <input
                 type="time"
@@ -358,13 +354,13 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                Lokacija / Platforma
+                {t.ui.eventModal.locationLabel}
               </label>
               <input
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="npr. Google Meet, Fabrika, ePorezi"
+                placeholder={t.ui.eventModal.locationPlaceholder}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-medium text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -374,40 +370,56 @@ export const ProfessionalEventModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                Prioritet
+                {t.ui.eventModal.priorityLabel}
               </label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="normal">🟢 Redovan prioritet</option>
-                <option value="high">🟡 Visok prioritet</option>
-                <option value="urgent">🔴 Hitan zakonski rok</option>
-                <option value="low">⚪ Nizak prioritet</option>
+                <option value="normal">
+                  🟢 {t.ui.calShifts.eventPriorityLabels.normal}
+                </option>
+                <option value="high">
+                  🟡 {t.ui.calShifts.eventPriorityLabels.high}
+                </option>
+                <option value="urgent">
+                  🔴 {t.ui.calShifts.eventPriorityLabels.urgent}
+                </option>
+                <option value="low">
+                  ⚪ {t.ui.calShifts.eventPriorityLabels.low}
+                </option>
               </select>
             </div>
 
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                Status
+                {t.ui.eventModal.statusLabel}
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               >
-                <option value="scheduled">📅 Zakazano / U najavi</option>
-                <option value="in_progress">⏳ U toku / U pripremi</option>
-                <option value="completed">✅ Uspešno obavljeno</option>
-                <option value="cancelled">❌ Otkazano / Odloženo</option>
+                <option value="scheduled">
+                  📅 {t.ui.calShifts.eventStatusLabels.scheduled}
+                </option>
+                <option value="in_progress">
+                  ⏳ {t.ui.calShifts.eventStatusLabels.in_progress}
+                </option>
+                <option value="completed">
+                  ✅ {t.ui.calShifts.eventStatusLabels.completed}
+                </option>
+                <option value="cancelled">
+                  ❌ {t.ui.calShifts.eventStatusLabels.cancelled}
+                </option>
               </select>
             </div>
 
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
-                Ugovoreni iznos / Honorar (opciono)
+                {t.ui.eventModal.amountLabel}
               </label>
               <div className="flex items-center gap-1.5">
                 <input
@@ -415,7 +427,7 @@ export const ProfessionalEventModal = ({
                   step="0.01"
                   value={financialAmount}
                   onChange={(e) => setFinancialAmount(e.target.value)}
-                  placeholder="npr. 1850"
+                  placeholder="1850"
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <select
@@ -435,14 +447,13 @@ export const ProfessionalEventModal = ({
           <div>
             <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-              Zakonska / Stručna Napomena (čl. 62 ZOR, poreski propisi, test
-              samostalnosti)
+              {t.ui.eventModal.complianceLabel}
             </label>
             <input
               type="text"
               value={complianceNote}
               onChange={(e) => setComplianceNote(e.target.value)}
-              placeholder="npr. Član 62 Zakona o radu RS - obavezan lekarski pregled za radnike sa noćnim smenama"
+              placeholder={t.ui.eventModal.compliancePlaceholder}
               className="w-full px-3 py-2 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 rounded-xl text-slate-800 dark:text-amber-200 outline-none focus:ring-2 focus:ring-amber-500"
             />
           </div>
@@ -451,13 +462,13 @@ export const ProfessionalEventModal = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2">
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5">
-                Detaljan opis i dogovorene tačke
+                {t.ui.eventModal.descLabel}
               </label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                placeholder="Unesite dnevni red, zahteve, dogovorene rokove i zaključke..."
+                placeholder={t.ui.eventModal.descPlaceholder}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
               />
             </div>
@@ -465,13 +476,13 @@ export const ProfessionalEventModal = ({
             <div>
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1.5 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-slate-400" />
-                Oznake (odvojene zarezom)
+                {t.ui.eventModal.tagsLabel}
               </label>
               <input
                 type="text"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
-                placeholder="sastanak, ugovor, nocni_rad"
+                placeholder="meeting, contract"
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -484,7 +495,7 @@ export const ProfessionalEventModal = ({
               onClick={onClose}
               className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-bold transition-colors cursor-pointer"
             >
-              Odustani
+              {t.ui.common.cancel}
             </button>
 
             <button
@@ -493,7 +504,9 @@ export const ProfessionalEventModal = ({
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>
-                {eventToEdit ? "Sa\u010Duvaj Izmene" : "Zaka\u017Ei Obavezu"}
+                {eventToEdit
+                  ? t.ui.eventModal.saveEditBtn
+                  : t.ui.eventModal.createBtn}
               </span>
             </button>
           </div>

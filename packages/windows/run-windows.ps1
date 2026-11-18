@@ -1,36 +1,40 @@
-# ShiftPulse Ledger Pro - PowerShell Live Test Runner
-# Za pokretanje: Right-click -> Run with PowerShell ili .\run-windows.ps1
+# ShiftPulse Ledger Pro - Windows PowerShell Commercial Workstation Runner
+# Run via Right-click -> Run with PowerShell or .\run-windows.ps1
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   ShiftPulse Ledger Pro - Windows PowerShell Live Runner" -ForegroundColor Cyan
+Write-Host "   ShiftPulse Ledger Pro - Commercial Workstation Runner  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
-# 1. Provera Node.js
+# 1. Verify Node.js runtime
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Warning "Node.js nije pronadjen! Instaliram preko winget-a..."
+    Write-Warning "Node.js not found! Attempting automated install via winget..."
     winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-        Write-Error "Molimo instalirajte Node.js sa https://nodejs.org i pokrenite ponovo."
+        Write-Error "Please install Node.js LTS from https://nodejs.org and re-run this launcher."
         Pause
         exit 1
     }
 }
 
-Write-Host "Node.js verzija: " -NoNewline -ForegroundColor Green
+Write-Host "Node.js runtime verified: " -NoNewline -ForegroundColor Green
 node -v
 
-# 2. Otvaranje browsera nakon starta
+# 2. Launch default browser after server binds
 $job = Start-Job -ScriptBlock {
     Start-Sleep -Seconds 2
     Start-Process "http://localhost:3000"
 }
 
-# 3. Pokretanje servera
-Write-Host "Pokrecem ShiftPulse Ledger Pro na http://localhost:3000..." -ForegroundColor Yellow
+# 3. Start Local Desktop Gateway
+$env:NODE_ENV = "production"
+$env:PORT = "3000"
+$env:SHIFTPULSE_LOCAL_DESKTOP = "1"
+$env:SHIFTPULSE_WORKSPACE_DIR = "$env:USERPROFILE\Documents\ShiftPulse_Workspace"
+Write-Host "Starting ShiftPulse Ledger Pro at http://localhost:3000 ..." -ForegroundColor Yellow
 if (Test-Path "server.js") {
     node server.js
 } else {

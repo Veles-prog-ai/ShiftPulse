@@ -4,7 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import fs from "fs";
+import os from "os";
 import { Client } from "pg";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { createLegalMonitorService } from "./legalMonitorEngine.js";
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,7 +52,7 @@ export function validatePromoLicense(licenseKeyBase64) {
     if (currentDate > expirationDate) {
       return {
         isValid: false,
-        reason: "Promotivni period od 3 meseca je istekao.",
+        reason: "Cryptographic license lease has expired.",
       };
     }
     return { isValid: true, payload };
@@ -57,12 +60,10 @@ export function validatePromoLicense(licenseKeyBase64) {
     return {
       isValid: false,
       reason:
-        "Kriti\u010Dna gre\u0161ka: Licencni klju\u010D je nevalidan ili izmenjen.",
+        "Critical error: License signature is invalid or corrupted.",
     };
   }
 }
-const OFFICIAL_PROMO_TOKEN_BASE64 =
-  "Eexn1rFAmFaX0gv2Z9/2kx0Nb7nLY3viD8ed5QJGuU1Kfo3PsLepxUYcOsz81yh8tStb4hDKaD4NRZef6RIfg9JcNBeap/kUDAuTerObVmLfycbgwlW6zj5rwCVzGO/Js4pB7eaozsd0btYoPL32XmoUxZRatMfoBwLkTjwX9vaXrGxzHA7z8zAb+gYzf3c+E2LTqpD+xNdIKhNpm0kMR2nrASJs86ys1pGa1kZD33YlTaS1GMFO4Z2ZqDRNkn/A66uCA4Rs9/49EWhPvHwx0xxfpHWiLIEUY6PnqnT95iiY5qEWBO2hWiynCpjXkztsJigNZLT6zFAA3CDPHD9i/Q==";
 const SYS_METADATA_FILE = path.join(__dirname, "sys_metadata.json");
 function getLocalStoredTime() {
   try {
@@ -180,37 +181,31 @@ function validirajLokalnuLicencu(kljucLicence) {
     };
   }
   const cleaned = kljucLicence.trim();
-  if (
-    cleaned === "SPL-PROMO-2026-01" ||
-    cleaned === OFFICIAL_PROMO_TOKEN_BASE64 ||
-    (!cleaned.includes(":") && cleaned.length > 80)
-  ) {
-    const promoCheck = validatePromoLicense(
-      cleaned === "SPL-PROMO-2026-01" ? OFFICIAL_PROMO_TOKEN_BASE64 : cleaned,
-    );
-    if (promoCheck.isValid && promoCheck.payload) {
+  if (!cleaned.includes(":") && cleaned.length > 80) {
+    const rsaCheck = validatePromoLicense(cleaned);
+    if (rsaCheck.isValid && rsaCheck.payload) {
       return {
         validna: true,
         podaci: {
-          licenseId: promoCheck.payload.licenseId,
-          nazivAgencije: promoCheck.payload.clientName,
-          pibAgencije: "109999888",
-          tier: promoCheck.payload.tier,
-          issuedAt: promoCheck.payload.issuedAt,
-          datumIsteka: promoCheck.payload.expiresAt,
-          maksimalnoRadnika: 5e3,
-          features: promoCheck.payload.features,
+          licenseId: rsaCheck.payload.licenseId,
+          nazivAgencije: rsaCheck.payload.clientName,
+          pibAgencije: rsaCheck.payload.pibAgencije || "N/A",
+          tier: rsaCheck.payload.tier,
+          issuedAt: rsaCheck.payload.issuedAt,
+          datumIsteka: rsaCheck.payload.expiresAt,
+          maksimalnoRadnika: Number(rsaCheck.payload.maksimalnoRadnika) || 5000,
+          features: rsaCheck.payload.features,
         },
       };
     } else {
-      return { validna: false, podaci: null, razlog: promoCheck.reason };
+      return { validna: false, podaci: null, razlog: rsaCheck.reason };
     }
   }
   if (!cleaned.includes(":")) {
     return {
       validna: false,
       podaci: null,
-      razlog: "Format licencnog klju\u010Da nije ispravan.",
+      razlog: "Invalid license key format.",
     };
   }
   try {
@@ -243,6 +238,39 @@ function validirajLokalnuLicencu(kljucLicence) {
   }
 }
 let AKTIVNI_KLIJENTSKI_KLJUC = process.env.B2B_LICENSE_KEY || "";
+const ISSUED_LICENSES_AUDIT_FILE = path.join(__dirname, "issued_licenses_audit.jsonl");
+
+function appendIssuedLicenseAudit(entry) {
+  try {
+    fs.appendFileSync(ISSUED_LICENSES_AUDIT_FILE, JSON.stringify(entry) + "\n", "utf8");
+  } catch (e) {
+    console.warn("License audit log warning:", e.message);
+  }
+}
+
+function readIssuedLicenseAudit(limit = 30) {
+  try {
+    if (!fs.existsSync(ISSUED_LICENSES_AUDIT_FILE)) return [];
+    const lines = fs
+      .readFileSync(ISSUED_LICENSES_AUDIT_FILE, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean);
+    return lines
+      .slice(-limit)
+      .reverse()
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 app.post("/api/license/admin-generate", (req, res) => {
   try {
     const { pibAgencije, nazivAgencije, maksimalnoRadnika, datumIsteka } =
@@ -260,9 +288,24 @@ app.post("/api/license/admin-generate", (req, res) => {
       datumIsteka: String(datumIsteka),
       // Format: YYYY-MM-DD
     });
+    const keyFingerprint = crypto
+      .createHash("sha256")
+      .update(noviKljuc)
+      .digest("hex")
+      .slice(0, 12);
+    appendIssuedLicenseAudit({
+      issuedAt: new Date().toISOString(),
+      pibAgencije: String(pibAgencije),
+      nazivAgencije: String(nazivAgencije),
+      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
+      datumIsteka: String(datumIsteka),
+      keyFingerprint,
+    });
     res.json({
       success: true,
+      kljucZaKlijenta: noviKljuc,
       kljujcZaKlijenta: noviKljuc,
+      keyFingerprint,
       napomena:
         "Kopirajte ovaj klju\u010D i po\u0161aljite ga knjigovodstvenoj agenciji da ga unese u svoj sistem.",
     });
@@ -284,14 +327,14 @@ app.get("/api/license/status", async (req, res) => {
     res.json({
       success: false,
       valid: false,
-      isDemo: false,
+      trial: false,
       antiClockTampering: {
         isTimeValid: false,
         reason: timeCheck.reason,
         lastRecorded: timeCheck.lastRecorded,
       },
-      licenciraniPravniSubjekat: "SISTEM ZAKLJU\u010CAN",
-      datumIsteka: "BLOKIRANO",
+      licenciraniPravniSubjekat: "SYSTEM LOCKED",
+      datumIsteka: "BLOCKED",
       poruka: timeCheck.reason,
     });
     return;
@@ -300,30 +343,16 @@ app.get("/api/license/status", async (req, res) => {
     res.json({
       success: false,
       valid: false,
-      isDemo: true,
+      trial: true,
       antiClockTampering: {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      promoDostupna: {
-        licenseId: "SPL-PROMO-2026-01",
-        clientName: "ShiftPulse Ledger Promo User",
-        tier: "Enterprise / Full Content",
-        issuedAt: "2026-10-30",
-        expiresAt: "2027-01-30",
-        features: [
-          "ai_scanner",
-          "conflict_monitor",
-          "b2b_shift_management",
-          "eporezi_xml",
-        ],
-        promoCode: "SPL-PROMO-2026-01",
-      },
-      licenciraniPravniSubjekat: "Nelicencirana Stanica (DEMO re\u017Eim)",
-      datumIsteka: "DEMO RE\u017DIM",
+      licenciraniPravniSubjekat: "Unlicensed Workstation (Trial)",
+      datumIsteka: "TRIAL",
       maksimalnoRadnika: 3,
       poruka:
-        "Softver radi u DEMO re\u017Eimu. Funkcije ePorezi XML izvoza su zaklju\u010Dane, a obra\u010Dun je ograni\u010Den na maksimalno 3 radnika.",
+        "Workstation running in unlicensed trial mode (up to 3 workers). ePorezi XML export requires an active commercial license.",
     });
     return;
   }
@@ -332,7 +361,7 @@ app.get("/api/license/status", async (req, res) => {
     res.json({
       success: true,
       valid: true,
-      isDemo: false,
+      trial: false,
       licenseId: provera.podaci.licenseId,
       licenciraniPravniSubjekat: provera.podaci.nazivAgencije,
       pibAgencije: provera.podaci.pibAgencije,
@@ -350,21 +379,21 @@ app.get("/api/license/status", async (req, res) => {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      poruka: `Sistem je uspe\u0161no autorizovan i licenciran (${provera.podaci.tier || "Enterprise"}).`,
+      poruka: `Station authorized and licensed (${provera.podaci.tier || "Enterprise"}).`,
     });
   } else {
     res.json({
       success: false,
       valid: false,
-      isDemo: true,
+      trial: true,
       antiClockTampering: {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      licenciraniPravniSubjekat: "Nelicencirana Stanica",
-      datumIsteka: "ISTEKLA",
+      licenciraniPravniSubjekat: "Unlicensed Workstation",
+      datumIsteka: "EXPIRED",
       poruka:
-        provera.razlog || "Licencni klju\u010D nedostaje ili je neispravan.",
+        provera.razlog || "License key is missing, invalid, or expired.",
     });
   }
 });
@@ -430,16 +459,16 @@ const štitLicence = async (req, res, next) => {
     ) {
       res.status(403).json({
         error:
-          "Demo ograni\u010Denje: U besplatnoj verziji mo\u017Eete obra\u010Dunati maksimalno 3 radnika odjednom.",
-        isDemo: true,
+          "Trial limit: Unlicensed workstations can calculate up to 3 employees per batch.",
+        trial: true,
       });
       return;
     }
     if (req.path === "/api/ledger/generate-xml") {
       res.status(403).json({
         error:
-          "Demo ograni\u010Denje: Funkcije ePorezi XML izvoza su zaklju\u010Dane u DEMO re\u017Eimu. Unesite licencni klju\u010D.",
-        isDemo: true,
+          "License required: ePorezi PPP-PD XML export requires an active commercial license key.",
+        trial: true,
       });
       return;
     }
@@ -450,7 +479,7 @@ const štitLicence = async (req, res, next) => {
   if (!provera.validna) {
     res.status(403).json({
       error:
-        "Pristup odbijen. Licenca za ovaj softver je neaktivna ili je istekla.",
+        "Access denied: Commercial license for this workstation is inactive or expired.",
       detalji: provera.razlog,
     });
     return;
@@ -461,8 +490,8 @@ const štitLicence = async (req, res, next) => {
     !provera.podaci.features.includes("eporezi_xml")
   ) {
     res.status(403).json({
-      error: "Va\u0161a licenca ne obuhvata modul za ePorezi XML izvoz.",
-      isDemo: false,
+      error: "Your active license tier does not include the ePorezi XML export module.",
+      trial: false,
     });
     return;
   }
@@ -590,48 +619,7 @@ app.post("/api/ledger/generate-xml", štitLicence, (req, res) => {
       });
   }
 });
-let interniRegistarOglasa = [
-  {
-    id: "oglas-lokalni-1",
-    clientId: "firma-1",
-    clientName: "TehnoProizvodnja d.o.o. Beograd",
-    clientType: "company",
-    tipOglasa: "potraznja_radnika",
-    naslovPozicije: "Operater na CNC glodalici",
-    detaljniUslovi:
-      "Potrebna ispomo\u0107 u pogonu za hitan izvozni projekat. Rad u turnusu 12h.",
-    budzetSatnica: 600,
-    valuta: "RSD",
-    lokacijaRada: "Obrenovac",
-    trajanjeAngazmana: "Projektno (2 meseca)",
-    status: "otvoren",
-    posrednickaProvizija: "50 RSD po radnom satu",
-    interneBeleskeAgencije:
-      "Hitno im je jer im kasni isporuka za Nema\u010Dku. Mo\u017Ee se ponuditi podizvo\u0111a\u010D ako ima slobodne ma\u0161ine.",
-    potencijalniMatchIds: [],
-    createdAt: /* @__PURE__ */ new Date().toISOString(),
-  },
-  {
-    id: "oglas-lokalni-2",
-    clientId: "freelance-1",
-    clientName: "Marko Ili\u0107 PR - Softverske Usluge",
-    clientType: "freelancer",
-    tipOglasa: "freelance_ponuda_posla",
-    naslovPozicije: "Izrada veb sajta i baze podataka",
-    detaljniUslovi:
-      "Full-stack programer nudi izradu internih ERP softvera i baza podataka za lokalne firme.",
-    budzetSatnica: 35,
-    valuta: "EUR",
-    lokacijaRada: "Remote / Obrenovac",
-    trajanjeAngazmana: "Po projektu",
-    status: "u_pregovorima",
-    posrednickaProvizija: "10% od ukupne vrednosti fakture",
-    interneBeleskeAgencije:
-      "Odli\u010Dan za proizvodna preduze\u0107a koja \u017Eele da digitalizuju magacin. Ponuditi direktoru TehnoProizvodnje.",
-    potencijalniMatchIds: ["firma-1"],
-    createdAt: /* @__PURE__ */ new Date().toISOString(),
-  },
-];
+let interniRegistarOglasa = [];
 app.get("/api/posredovanje/oglasi", (req, res) => {
   res.json({ success: true, oglasi: interniRegistarOglasa });
 });
@@ -659,44 +647,323 @@ app.patch("/api/posredovanje/status/:id", (req, res) => {
   );
   res.json({ success: true, message: "Dosije oglasa a\u017Euriran." });
 });
-app.post("/api/legal/log-action", (req, res) => {
+// ========================================================
+// OPTIMIZED SERVER-SIDE GEMINI AI & ZERO-PII HITL TELEMETRY
+// ========================================================
+const HITL_AUDIT_LOG_FILE = path.join(__dirname, "hitl_approval_audit.jsonl");
+
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: { headers: { "User-Agent": "aistudio-build" } },
+  });
+}
+
+function handleGeminiError(res, err, fallbackMsg) {
+  const status = err?.status || err?.code || 500;
+  const httpStatus = status === 429 ? 429 : status >= 400 && status < 500 ? status : 502;
+  res.status(httpStatus).json({
+    success: false,
+    error: fallbackMsg,
+    details: err?.message || "Nepoznata greška AI gateway-a.",
+  });
+}
+
+function persistSanitizedHitlLog(rawBody = {}) {
+  const allowedDecisions = ["approved", "edited_approved", "rejected"];
+  const normalizedDecision = allowedDecisions.includes(rawBody.decision)
+    ? rawBody.decision
+    : rawBody.akcija === "odbijeno"
+      ? "rejected"
+      : "approved";
+
+  // ZERO-KNOWLEDGE: Prikupljamo ISKLJUČIVO nalog/ulogu i status odobrenja AI odgovora.
+  // Nikakvi finansijski podaci, PIB, plate, imena klijenata ili tekstovi ugovora se NE ČUVAJU.
+  const sanitizedEntry = {
+    logId: `hitl-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+    timestamp: new Date().toISOString(),
+    licenseId: String(rawBody.licenseId || "STATION-LOCAL").slice(0, 64),
+    accountId: String(rawBody.accountId || "op-owner-1").slice(0, 64),
+    accountUsername: String(
+      rawBody.accountUsername || rawBody.operaterIme || "lokalni_operater",
+    ).slice(0, 64),
+    accountRole: String(rawBody.accountRole || "Ovlašćeni Operater").slice(0, 64),
+    module: String(rawBody.module || "ai_copilot").slice(0, 64),
+    decision: normalizedDecision,
+    aiModel: String(rawBody.aiModel || "gemini-4-hydrogen").slice(0, 64),
+    executionSource: String(rawBody.executionSource || "gemini_api").slice(0, 32),
+    totalTokens: Math.max(0, Number(rawBody.totalTokens) || 0),
+    attestationConfirmed: rawBody.attestationConfirmed !== false,
+  };
+
+  fs.appendFileSync(HITL_AUDIT_LOG_FILE, JSON.stringify(sanitizedEntry) + "\n", "utf8");
+  return sanitizedEntry;
+}
+
+app.post("/api/legal/analyze-document", async (req, res) => {
   try {
-    const { pibKompanije, operaterIme, aiPredlog, konacniPodaci, akcija } =
-      req.body;
-    const logZapis = {
-      timestamp: /* @__PURE__ */ new Date().toISOString(),
-      akcija,
-      pibKompanije: pibKompanije || "DEMO_PIB",
-      operater: operaterIme || "Lokalni Operater",
-      licencaValidna: true,
-      podaci: {
-        staJeAiPredlozio: aiPredlog,
-        staJeCovekPotvrdio: konacniPodaci,
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        success: false,
+        code: "GEMINI_KEY_MISSING",
+        error:
+          "GEMINI_API_KEY nije podešen na serveru. Koristite lokalni deterministički analitičar dokumenata (0 tokena).",
+      });
+    }
+
+    const { base64Data, mimeType, extractedTextSnippet } = req.body || {};
+    if (!base64Data && !extractedTextSnippet) {
+      return res.status(400).json({
+        success: false,
+        error: "Nedostaje dokument ili tekst za AI analizu.",
+      });
+    }
+
+    const parts = [];
+    if (extractedTextSnippet) {
+      parts.push({
+        text: `Analiziraj radni ugovor / platni list (RS Zakon o radu):\n${String(extractedTextSnippet).slice(0, 8000)}`,
+      });
+    } else {
+      parts.push({
+        inlineData: {
+          data: String(base64Data),
+          mimeType: mimeType || "application/pdf",
+        },
+      });
+      parts.push({
+        text: "Izvuci poslodavca, ulogu, satnicu, prekovremeni/noćni rad i proveri odstupanja od Zakona o radu RS.",
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-4-hydrogen",
+      contents: parts,
+      config: {
+        systemInstruction:
+          "Ti si precizan pravno-obračunski ekstraktor za RS Zakon o radu. Izvuci tražena polja sažeto u JSON formatu; ako podatak nedostaje stavi 0 ili 'Nepoznato'. U legalComplianceAlerts navedi samo konkretna zakonska upozorenja (maks 3 kratke stavke).",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            contractAnalysis: {
+              type: Type.OBJECT,
+              properties: {
+                employerName: { type: Type.STRING },
+                detectedRole: { type: Type.STRING },
+                baseHourlyRate: { type: Type.NUMBER },
+                currency: { type: Type.STRING },
+              },
+              required: ["employerName", "detectedRole", "baseHourlyRate", "currency"],
+            },
+            extractedRules: {
+              type: Type.OBJECT,
+              properties: {
+                dailyOvertimeThreshold: { type: Type.NUMBER },
+                overtimeMultiplier: { type: Type.NUMBER },
+                nightDiffEnabled: { type: Type.BOOLEAN },
+                nightShiftWindow: {
+                  type: Type.OBJECT,
+                  properties: {
+                    start: { type: Type.STRING },
+                    end: { type: Type.STRING },
+                  },
+                  required: ["start", "end"],
+                },
+                nightDiffValue: { type: Type.NUMBER },
+              },
+              required: [
+                "dailyOvertimeThreshold",
+                "overtimeMultiplier",
+                "nightDiffEnabled",
+                "nightShiftWindow",
+                "nightDiffValue",
+              ],
+            },
+            legalComplianceAlerts: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ["contractAnalysis", "extractedRules", "legalComplianceAlerts"],
+        },
       },
-      // Pravno-tehnička klauzula koja se pakuje u svaki log
-      pravnaIzjava:
-        "Korisnik potvr\u0111uje da je li\u010Dno prekontrolisao AI predlog i garantuje za ta\u010Dnost unetih podataka u skladu sa Uslovima kori\u0161\u0107enja.",
-    };
-    const logFilePath = path.join(__dirname, "audit_ledger_pro.log");
-    const logLinija = JSON.stringify(logZapis) + "\n";
-    fs.appendFileSync(logFilePath, logLinija, "utf8");
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    const usage = response.usageMetadata || {};
+
     res.json({
       success: true,
-      message:
-        "Operacija je uspe\u0161no autentifikovana od strane operatera i trajno zabele\u017Eena u Audit Log.",
+      ...parsed,
+      aiMeta: {
+        model: "gemini-4-hydrogen",
+        thinkingLevel: "LOW",
+        executionSource: "gemini_api",
+        promptTokens: usage.promptTokenCount || 0,
+        outputTokens: usage.candidatesTokenCount || 0,
+        totalTokens: usage.totalTokenCount || 0,
+      },
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        error: "Gre\u0161ka pri upisu u bezbednosni log.",
-        details: error.message,
+    console.error("Gemini document analysis error:", error);
+    handleGeminiError(res, error, "Greška tokom server-side Gemini analize dokumenta.");
+  }
+});
+
+app.post("/api/schedule/detect-conflicts", async (req, res) => {
+  try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({
+        success: false,
+        code: "GEMINI_KEY_MISSING",
+        error: "GEMINI_API_KEY nije podešen na serveru za kompleksnu analizu poruka.",
       });
+    }
+
+    const { incomingMessage, compactScheduleSummary, existingShifts } = req.body || {};
+    if (!incomingMessage) {
+      return res.status(400).json({
+        success: false,
+        error: "Nedostaje ulazna poruka za proveru konflikta.",
+      });
+    }
+
+    // Optimizacija tokena: koristi već sabijeni tekst ili kompajlira maks 15 smena server-side
+    const scheduleStr = compactScheduleSummary
+      ? String(compactScheduleSummary).slice(0, 1500)
+      : Array.isArray(existingShifts)
+        ? existingShifts
+            .slice(0, 15)
+            .map((s) => `${s.date} ${s.startTime}-${s.endTime}`)
+            .join("; ")
+        : "Nema zakazanih smena";
+
+    const response = await ai.models.generateContent({
+      model: "gemini-4-hydrogen",
+      contents: `Raspored: ${scheduleStr || "Prazan"}\nPoruka: ${String(incomingMessage).slice(0, 1200)}`,
+      config: {
+        systemInstruction:
+          "Proveri da li nova poruka sadrži preklapanje smena sa rasporedom. Vrati kratak status i profesionalan nacrt odgovora na srpskom jeziku.",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            conflictDetected: { type: Type.BOOLEAN },
+            detectedDate: { type: Type.STRING },
+            detectedTimeWindow: { type: Type.STRING },
+            conflictDetails: { type: Type.STRING },
+            suggestedReplyTemplate: { type: Type.STRING },
+          },
+          required: ["conflictDetected", "conflictDetails", "suggestedReplyTemplate"],
+        },
+      },
+    });
+
+    const parsed = JSON.parse(response.text || "{}");
+    const usage = response.usageMetadata || {};
+
+    res.json({
+      success: true,
+      ...parsed,
+      aiMeta: {
+        model: "gemini-4-hydrogen",
+        thinkingLevel: "LOW",
+        executionSource: "gemini_api",
+        promptTokens: usage.promptTokenCount || 0,
+        outputTokens: usage.candidatesTokenCount || 0,
+        totalTokens: usage.totalTokenCount || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Gemini conflict detection error:", error);
+    handleGeminiError(res, error, "Greška tokom Gemini provere konflikta smena.");
+  }
+});
+
+app.post("/api/hitl/log-approval", (req, res) => {
+  try {
+    const entry = persistSanitizedHitlLog(req.body || {});
+    res.json({
+      success: true,
+      privacyGuarantee: "account-and-approval-status-only",
+      entry,
+      message:
+        "HITL odluka lokalnog naloga je trajno zabeležena na serveru bez ikakvih poslovnih ili ličnih podataka.",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Greška pri upisu HITL telemetrije.",
+      details: error.message,
+    });
+  }
+});
+
+app.get("/api/hitl/logs", (_req, res) => {
+  try {
+    if (!fs.existsSync(HITL_AUDIT_LOG_FILE)) {
+      return res.json({
+        success: true,
+        privacyGuarantee: "account-and-approval-status-only",
+        totalCount: 0,
+        logs: [],
+      });
+    }
+    const lines = fs
+      .readFileSync(HITL_AUDIT_LOG_FILE, "utf8")
+      .split(/\r?\n/)
+      .filter(Boolean);
+    const parsed = lines
+      .slice(-100)
+      .reverse()
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    res.json({
+      success: true,
+      privacyGuarantee: "account-and-approval-status-only",
+      totalCount: lines.length,
+      logs: parsed,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Sanitized backward-compatible alias: više NE upisuje PIB ni sadržaj ugovora!
+app.post("/api/legal/log-action", (req, res) => {
+  try {
+    const entry = persistSanitizedHitlLog(req.body || {});
+    res.json({
+      success: true,
+      privacyGuarantee: "account-and-approval-status-only",
+      entry,
+      message:
+        "Operacija je autentifikovana od strane lokalnog naloga i zabeležena samo kao status odobrenja.",
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Greška pri upisu u bezbednosni log.",
+      details: error.message,
+    });
   }
 });
 
 // ========================================================
-// DISTRIBUTION & LIVE TESTING PACKAGES (Windows, Linux, ChromeOS)
+// COMMERCIAL OS DISTRIBUTION PACKAGES (Windows, Linux, ChromeOS)
 // ========================================================
 app.get("/api/packages/info", (_req, res) => {
   const downloadsDir = path.join(__dirname, "public", "downloads");
@@ -712,42 +979,43 @@ app.get("/api/packages/info", (_req, res) => {
         updatedAt: stat.mtime.toISOString(),
       };
     }
-    return { exists: false, sizeBytes: 0, sizeFormatted: "Nije generisan" };
+    return { exists: false, sizeBytes: 0, sizeFormatted: "Not generated" };
   };
 
   res.json({
     success: true,
+    launchMarket: "RS",
     packages: {
       windows: {
         id: "win",
         title: "Windows 10 / 11 / Server",
         filename: "shiftpulse-windows-package.zip",
-        format: "ZIP Arhiva",
+        format: "ZIP Archive",
         downloadUrl: "/api/packages/download/windows",
         ...getFileInfo("shiftpulse-windows-package.zip"),
         instructions: [
-          "Raspakujte zip arhivu u bilo koji direktorijum",
-          "Dvaput kliknite na 'install-windows.bat' za automatsko podešavanje",
-          "Aplikacija se pokreće sa radne površine (Desktop) ili preko 'start-windows.bat'",
+          "Extract the ZIP archive to any local directory",
+          "Double-click 'install-windows.bat' to configure the local workspace folders",
+          "Launch from the Desktop shortcut or via 'start-windows.bat'",
         ],
         targetRuntimes: ["Windows 10", "Windows 11", "Windows Server 2019/2022"],
         features: [
-          "Automatska prečica na radnoj površini",
-          "Node.js automatska detekcija i instalacija",
-          "Offline baza i lokalni audit log",
+          "Automatic ShiftPulse_Workspace subfolder provisioning",
+          "Desktop shortcut & local workstation gateway",
+          "Offline P&L/Tax scanner and local HITL audit log",
         ],
       },
       linux: {
         id: "linux",
         title: "Linux (Ubuntu / Debian / Fedora / Arch)",
         filename: "shiftpulse-linux-package.tar.gz",
-        format: "TAR.GZ Arhiva",
+        format: "TAR.GZ Archive",
         downloadUrl: "/api/packages/download/linux",
         ...getFileInfo("shiftpulse-linux-package.tar.gz"),
         instructions: [
-          "Raspakujte arhivu: tar -xzf shiftpulse-linux-package.tar.gz",
-          "Dodelite prava i instalirajte: chmod +x install-linux.sh && ./install-linux.sh",
-          "Pokrenite iz GNOME/KDE menija ili preko terminala: ./start-linux.sh",
+          "Extract archive: tar -xzf shiftpulse-linux-package.tar.gz",
+          "Make executable & install: chmod +x install-linux.sh && ./install-linux.sh",
+          "Launch from your Desktop Application Menu or run ./start-linux.sh",
         ],
         targetRuntimes: [
           "Ubuntu 20.04 / 22.04 / 24.04",
@@ -756,9 +1024,9 @@ app.get("/api/packages/info", (_req, res) => {
           "Arch Linux",
         ],
         features: [
-          "FreeDesktop .desktop integracija u meni aplikacija",
-          "xdg-open browser automatsko pokretanje",
-          "AppImage i .deb kompatibilnost",
+          "FreeDesktop .desktop application menu integration",
+          "Auto-provisioned ~/ShiftPulse_Workspace directory tree",
+          "Offline workstation mode with zero cloud data leakage",
         ],
       },
       chromeos: {
@@ -769,14 +1037,14 @@ app.get("/api/packages/info", (_req, res) => {
         downloadUrl: "/api/packages/download/chromeos",
         ...getFileInfo("shiftpulse-chromeos-package.zip"),
         instructions: [
-          "1-Klik Native PWA: Otvorite u Chrome browseru i kliknite 'Instaliraj na policu'",
-          "Crostini Linux kontejner: Raspakujte zip i pokrenite: chmod +x install-chromeos.sh && ./install-chromeos.sh",
+          "1-Click Native PWA: Open in Chrome and click 'Install to Shelf'",
+          "Crostini Linux container: Extract zip and run chmod +x install-chromeos.sh && ./install-chromeos.sh",
         ],
         targetRuntimes: ["ChromeOS (Chromebook)", "ChromeOS Flex"],
         features: [
-          "1-Klik instalacija na ChromeOS Policu (Shelf)",
-          "Offline Service Worker keširanje bez interneta",
-          "Crostini Linux kontejner podrška za lokalni server",
+          "1-Click ChromeOS Shelf installation",
+          "Offline Service Worker caching for air-gapped work",
+          "Crostini Linux container local server bundle",
         ],
       },
     },
@@ -805,8 +1073,345 @@ app.get("/api/packages/download/:os", (req, res) => {
 
   res.download(filePath, filename);
 });
+
+// ========================================================
+// HYBRID GATEWAY & LOCAL WORKSPACE ARCHITECTURE (ZERO-KNOWLEDGE)
+// ========================================================
+const LOCAL_WORKSPACE_ROOT =
+  process.env.SHIFTPULSE_WORKSPACE_DIR ||
+  path.join(os.homedir(), "ShiftPulse_Workspace");
+
+const WORKSPACE_FOLDER_STRUCTURE = {
+  "01_Ulaz_Dokumenta": [
+    "Fakture_Racuni",
+    "Otpremnice",
+    "POS_Slipovi_Fiskalni",
+    "Bankarski_Izvodi",
+    "Obrada_Zavrseno",
+  ],
+  "02_Izlaz_Dokumenta": [
+    "Bilansi_Porezi_CSV",
+    "Zarade_ePorezi_XML",
+    "Virmani_Nalozi",
+    "Arhiva_Ugovori",
+  ],
+  "03_Korisnicki_Backup": [],
+};
+
+function isLocalDesktopRuntime(req) {
+  if (process.env.SHIFTPULSE_LOCAL_DESKTOP === "1") return true;
+  if (!req) return false;
+  const host = String(req.headers.host || "").split(":")[0].toLowerCase();
+  const forwarded = req.headers["x-forwarded-host"];
+  return !forwarded && (host === "localhost" || host === "127.0.0.1" || host === "::1");
+}
+
+function ensureLocalWorkspaceTree(rootDir = LOCAL_WORKSPACE_ROOT) {
+  fs.mkdirSync(rootDir, { recursive: true });
+  for (const [topDir, subDirs] of Object.entries(WORKSPACE_FOLDER_STRUCTURE)) {
+    const topPath = path.join(rootDir, topDir);
+    fs.mkdirSync(topPath, { recursive: true });
+    for (const sub of subDirs) {
+      fs.mkdirSync(path.join(topPath, sub), { recursive: true });
+    }
+  }
+  const readmePath = path.join(rootDir, "UPUTSTVO_OFFLINE_RAD.txt");
+  if (!fs.existsSync(readmePath)) {
+    fs.writeFileSync(
+      readmePath,
+      [
+        "SHIFTPULSE LEDGER PRO - LOKALNI RADNI PROSTOR",
+        "01_Ulaz_Dokumenta/ -> Ubaci fakture, otpremnice, slipove, izvode za offline skeniranje",
+        "02_Izlaz_Dokumenta/ -> Generisani CSV bilansi, ePorezi XML, virmani i ugovori",
+        "03_Korisnicki_Backup/ -> Enkriptovani AES-256-GCM korisnicki backup fajlovi",
+      ].join("\n"),
+      "utf-8",
+    );
+  }
+  const manifestPath = path.join(rootDir, "workspace-manifest.json");
+  if (!fs.existsSync(manifestPath)) {
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify(
+        {
+          app: "ShiftPulse Ledger Pro",
+          privacyPolicy: "zero-knowledge-client-device-only",
+          createdAt: new Date().toISOString(),
+          folders: WORKSPACE_FOLDER_STRUCTURE,
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+  }
+  return rootDir;
+}
+
+if (process.env.SHIFTPULSE_LOCAL_DESKTOP === "1") {
+  try {
+    ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
+  } catch (e) {
+    console.warn("Workspace init warning:", e.message);
+  }
+}
+
+const requireLocalDesktop = (req, res, next) => {
+  if (!isLocalDesktopRuntime(req)) {
+    return res.status(403).json({
+      success: false,
+      error:
+        "Zero-Knowledge Gateway politika: Cloud server ne pristupa lokalnim fajlovima. Koristite lokalnu Desktop instalaciju ili Browser Folder Picker.",
+    });
+  }
+  next();
+};
+
+const legalMonitorService = createLegalMonitorService(__dirname);
+
+app.get("/api/gateway/status", (req, res) => {
+  const localDesktopActive = isLocalDesktopRuntime(req);
+  const lm = legalMonitorService.getStatus();
+  res.json({
+    success: true,
+    gatewayRole: "license-and-regulatory-gateway",
+    launchMarket: "RS",
+    supportedJurisdictions: ["RS"],
+    zeroKnowledgePrivacy: true,
+    clientDataStoredOnServer: false,
+    localDesktopActive,
+    workspacePath: localDesktopActive ? LOCAL_WORKSPACE_ROOT : null,
+    offlineCapable: true,
+    separatedInterfaces: {
+      clientWorkspace: "/",
+      publicWebsite: "/site",
+      installPortal: "/install",
+      adminConsole: "/admin",
+    },
+    legalMonitorSummary: {
+      watchedLawsCount: lm.laws.length,
+      unreadNotifications: lm.telemetry.unreadCount,
+      lastCheckAt: lm.telemetry.lastCheckAt,
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/health", (_req, res) => {
+  res.json({
+    success: true,
+    status: "ok",
+    port: PORT,
+    uptimeSec: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/api/admin/overview", (_req, res) => {
+  try {
+    const mem = process.memoryUsage();
+    const lm = legalMonitorService.getStatus();
+    let hitlTotalCount = 0;
+    if (fs.existsSync(HITL_AUDIT_LOG_FILE)) {
+      hitlTotalCount = fs
+        .readFileSync(HITL_AUDIT_LOG_FILE, "utf8")
+        .split(/\r?\n/)
+        .filter(Boolean).length;
+    }
+    res.json({
+      success: true,
+      server: {
+        status: "online",
+        port: PORT,
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        uptimeSec: Math.round(process.uptime()),
+        rssMemoryMb: Math.round((mem.rss / 1024 / 1024) * 10) / 10,
+        heapUsedMb: Math.round((mem.heapUsed / 1024 / 1024) * 10) / 10,
+        geminiProxyConfigured: Boolean(process.env.GEMINI_API_KEY),
+        databaseConfigured: Boolean(globalPgClient),
+      },
+      hitl: {
+        totalLogs: hitlTotalCount,
+        privacyGuarantee: "account-and-approval-status-only",
+      },
+      legalMonitor: {
+        watchedLawsCount: lm.laws.length,
+        unreadNotifications: lm.telemetry.unreadCount,
+        lastCheckAt: lm.telemetry.lastCheckAt,
+      },
+      issuedLicenses: readIssuedLicenseAudit(25),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========================================================
+// AUTOMATED LOW-RESOURCE LEGAL CHANGE MONITOR (SERVER / ADMIN)
+// ========================================================
+app.get("/api/legal-monitor/status", (_req, res) => {
+  res.json(legalMonitorService.getStatus());
+});
+
+app.post("/api/legal-monitor/check-now", async (_req, res) => {
+  try {
+    const result = await legalMonitorService.runLightweightHttpChecks();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/legal-monitor/compare", (req, res) => {
+  try {
+    const { lawId, updatedText, articleLabel, summaryNote, severity } = req.body || {};
+    const outcome = legalMonitorService.compareClauseAndNotifyAdmin({
+      lawId,
+      updatedText,
+      articleLabel,
+      summaryNote,
+      severity,
+    });
+    if (!outcome.success) {
+      return res.status(400).json(outcome);
+    }
+    res.json(outcome);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/legal-monitor/notifications/:id/acknowledge", (req, res) => {
+  try {
+    const { adoptAsBaseline } = req.body || {};
+    const outcome = legalMonitorService.acknowledgeNotification(req.params.id, {
+      adoptAsBaseline: Boolean(adoptAsBaseline),
+    });
+    if (!outcome.success) {
+      return res.status(404).json(outcome);
+    }
+    res.json(outcome);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/workspace/init", requireLocalDesktop, (_req, res) => {
+  try {
+    const root = ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
+    res.json({
+      success: true,
+      workspacePath: root,
+      folders: WORKSPACE_FOLDER_STRUCTURE,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/workspace/input-files", requireLocalDesktop, (_req, res) => {
+  try {
+    const root = ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
+    const inputRoot = path.join(root, "01_Ulaz_Dokumenta");
+    const files = [];
+
+    const walk = (dir, relFolder) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name.startsWith(".")) continue;
+        if (entry.isDirectory()) {
+          if (entry.name !== "Obrada_Zavrseno") {
+            walk(path.join(dir, entry.name), entry.name);
+          }
+        } else if (entry.isFile()) {
+          const full = path.join(dir, entry.name);
+          const stat = fs.statSync(full);
+          files.push({
+            id: `disk-${relFolder}-${entry.name}-${stat.size}`,
+            subfolder: relFolder,
+            name: entry.name,
+            relativePath: path.posix.join("01_Ulaz_Dokumenta", relFolder === "01_Ulaz_Dokumenta" ? "" : relFolder, entry.name),
+            size: stat.size,
+            lastModified: stat.mtimeMs,
+            source: "local-desktop",
+          });
+        }
+      }
+    };
+    walk(inputRoot, "01_Ulaz_Dokumenta");
+    res.json({ success: true, workspacePath: root, files });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/workspace/read-input-file", requireLocalDesktop, (req, res) => {
+  try {
+    const rel = String(req.query.path || "");
+    const inputBase = path.resolve(LOCAL_WORKSPACE_ROOT, "01_Ulaz_Dokumenta");
+    const target = path.resolve(LOCAL_WORKSPACE_ROOT, rel);
+    if (!target.startsWith(inputBase + path.sep) || !fs.existsSync(target)) {
+      return res.status(404).json({ success: false, error: "Fajl nije pronađen u 01_Ulaz_Dokumenta." });
+    }
+    res.sendFile(target);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/workspace/save-output", requireLocalDesktop, (req, res) => {
+  try {
+    const { topFolder = "02_Izlaz_Dokumenta", subFolder = "", filename, content } = req.body || {};
+    if (!filename || typeof content !== "string") {
+      return res.status(400).json({ success: false, error: "Nedostaju naziv fajla ili sadržaj." });
+    }
+    const allowedTop = ["02_Izlaz_Dokumenta", "03_Korisnicki_Backup"].includes(topFolder)
+      ? topFolder
+      : "02_Izlaz_Dokumenta";
+    const safeSub = String(subFolder || "").replace(/[^a-zA-Z0-9_-]/g, "");
+    const safeFile = path.basename(String(filename)).replace(/[<>:"/\\|?*]/g, "_");
+
+    const root = ensureLocalWorkspaceTree(LOCAL_WORKSPACE_ROOT);
+    const destDir = safeSub ? path.join(root, allowedTop, safeSub) : path.join(root, allowedTop);
+    fs.mkdirSync(destDir, { recursive: true });
+    const fullDest = path.resolve(destDir, safeFile);
+    if (!fullDest.startsWith(path.resolve(root) + path.sep)) {
+      return res.status(400).json({ success: false, error: "Neispravna putanja." });
+    }
+    fs.writeFileSync(fullDest, content, "utf-8");
+    res.json({ success: true, savedPath: fullDest });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========================================================
+// PUBLIC WEBSITE / LANDING, INSTALL & ADMIN CONSOLE ROUTES
+// ========================================================
+app.get(["/site", "/landing", "/download"], (_req, res) => {
+  res.sendFile(path.resolve(__dirname, "public", "landing.html"));
+});
+
+app.get("/install", (_req, res) => {
+  res.sendFile(path.resolve(__dirname, "public", "install.html"));
+});
+
+app.get("/admin", (_req, res) => {
+  res.sendFile(path.resolve(__dirname, "public", "admin.html"));
+});
+
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  // Always serve static assets from public/ so manifests, icons and packages are available
+  app.use(express.static(path.resolve(__dirname, "public")));
+
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    (fs.existsSync(path.resolve(__dirname, "dist", "index.html")) &&
+      !fs.existsSync(path.resolve(__dirname, "src", "main.jsx")));
+
+  if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },

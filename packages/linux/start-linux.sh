@@ -22,6 +22,11 @@ echo ""
   fi
 ) &
 
+export NODE_ENV=production
+export PORT=3000
+export SHIFTPULSE_LOCAL_DESKTOP=1
+export SHIFTPULSE_WORKSPACE_DIR="${HOME}/ShiftPulse_Workspace"
+
 if [ -f "server.js" ]; then
     exec node server.js
 else

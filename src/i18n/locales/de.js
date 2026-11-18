@@ -353,13 +353,13 @@ export const de = {
     importDesc:
       "W\xE4hlen Sie eine zuvor exportierte ShiftPulse-JSON-Datei aus, um alle Daten wiederherzustellen.",
     importBtn: "JSON-Datei ausw\xE4hlen",
-    resetTitle: "Auf Musterdaten zur\xFCcksetzen",
+    resetTitle: "Lokale Arbeitsbereichsdaten l\xF6schen",
     resetDesc:
-      "Achtung: Dies ersetzt alle aktuellen Daten durch das Standard-Demoprofil mit 12h-Rotationsschichten.",
-    resetBtn: "Musterdaten laden",
+      "Achtung: Dadurch werden alle lokal gespeicherten Kundenprofile, Schichten und Abrechnungen auf diesem Ger\xE4t gel\xF6scht.",
+    resetBtn: "Lokale Daten l\xF6schen",
     close: "Schlie\xDFen",
     resetConfirm:
-      "M\xF6chten Sie wirklich auf die Musterdaten zur\xFCcksetzen? Nicht gespeicherte \xC4nderungen gehen verloren.",
+      "M\xF6chten Sie wirklich alle lokalen Daten l\xF6schen? Nicht gesicherte Eintr\xE4ge gehen verloren.",
     importSuccess: "Daten wurden erfolgreich wiederhergestellt!",
     importError:
       "Fehler beim Lesen der JSON-Datei. Bitte Format \xFCberpr\xFCfen.",
@@ -496,8 +496,8 @@ export const de = {
     activatePro: "Auf Premium Pro upgraden (3,99 $/Monat)",
     activateTrial: "14-t\xE4gige kostenlose Pro-Testphase starten",
     cancelSubscription:
-      "Zur kostenlosen Version zur\xFCckkehren (Werbung zum Test aktivieren)",
-    testModeToggle: "Schnell-Testmodus (Frei / Pro umschalten)",
+      "Zum kostenlosen Basistarif wechseln",
+    testModeToggle: "Aktueller Lizenzstatus",
     activeTier: "Aktueller Mitgliedschaftsstatus",
     featureNoAds: "100% werbefreies Erlebnis",
     featureNoAdsDesc:

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import {
   X,
   Calendar as CalendarIcon,
@@ -9,11 +10,10 @@ import {
   Check,
   FileEdit,
 } from "lucide-react";
-const PRESETS = [
+
+const PRESET_DEFS = [
   {
     code: "R",
-    label: "R (8h)",
-    fullTitle: "Redovno radno vreme (8h)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -21,12 +21,9 @@ const PRESETS = [
     endTime: "16:00",
     colorClass:
       "bg-blue-100 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700",
-    description: "Puno radno vreme 40h nedeljno, \u010Dl. 51 Zakona o radu",
   },
   {
     code: "I",
-    label: "I (8h)",
-    fullTitle: "I Jutarnja smena (8h)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -34,12 +31,9 @@ const PRESETS = [
     endTime: "14:00",
     colorClass:
       "bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
-    description: "Prva jutarnja smena u pogonu",
   },
   {
     code: "II",
-    label: "II (8h)",
-    fullTitle: "II Popodnevna smena (8h)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -47,12 +41,9 @@ const PRESETS = [
     endTime: "22:00",
     colorClass:
       "bg-orange-100 dark:bg-orange-950/70 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700",
-    description: "Druga popodnevna smena",
   },
   {
     code: "III",
-    label: "III (8h)",
-    fullTitle: "III No\u0107na smena (8h +26%)",
     dayHours: 0,
     nightHours: 8,
     overtimeHours: 0,
@@ -60,13 +51,9 @@ const PRESETS = [
     endTime: "06:00",
     colorClass:
       "bg-indigo-100 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700",
-    description:
-      "Zakonski dodatak na no\u0107ni rad +26%, \u010Dl. 108 Zakona o radu",
   },
   {
     code: "D",
-    label: "D (12h)",
-    fullTitle: "Turnus 12h Dan",
     dayHours: 12,
     nightHours: 0,
     overtimeHours: 0,
@@ -74,12 +61,9 @@ const PRESETS = [
     endTime: "19:00",
     colorClass:
       "bg-yellow-100 dark:bg-yellow-950/70 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
-    description: "Dnevna smena u turnusnom re\u017Eimu",
   },
   {
     code: "N",
-    label: "N (12h)",
-    fullTitle: "Turnus 12h No\u0107 (+26%)",
     dayHours: 0,
     nightHours: 12,
     overtimeHours: 0,
@@ -87,13 +71,9 @@ const PRESETS = [
     endTime: "07:00",
     colorClass:
       "bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700",
-    description:
-      "No\u0107na turnusna smena sa ura\u010Dunatim uve\u0107anjem od 26%",
   },
   {
     code: "O",
-    label: "O (0h)",
-    fullTitle: "Slobodan dan / Nedeljni odmor",
     dayHours: 0,
     nightHours: 0,
     overtimeHours: 0,
@@ -101,12 +81,9 @@ const PRESETS = [
     endTime: "",
     colorClass:
       "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700",
-    description: "Zakon o radu \u010Dl. 67 (dnevni/nedeljni odmor)",
   },
   {
     code: "GO",
-    label: "GO",
-    fullTitle: "Godišnji odmor (Plaćeno odsustvo 100%)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -114,12 +91,9 @@ const PRESETS = [
     endTime: "16:00",
     colorClass:
       "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700",
-    description: "Rešenje o korišćenju godišnjeg odmora (čl. 114 ZOR - 100% naknada)",
   },
   {
     code: "B",
-    label: "B (65%)",
-    fullTitle: "Bolovanje do 30 dana (Opšta bolest 65%)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -127,12 +101,9 @@ const PRESETS = [
     endTime: "16:00",
     colorClass:
       "bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700",
-    description: "Do 30 dana na teret poslodavca (65% osnovice, čl. 115 ZOR)",
   },
   {
     code: "B100",
-    label: "B (100%)",
-    fullTitle: "Bolovanje - povreda na radu (100%)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -140,12 +111,9 @@ const PRESETS = [
     endTime: "16:00",
     colorClass:
       "bg-amber-100 dark:bg-amber-950/70 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700",
-    description: "Povreda na radu ili profesionalna bolest (100% naknada)",
   },
   {
     code: "RFZO",
-    label: "RFZO",
-    fullTitle: "Bolovanje preko 30 dana (RFZO)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 0,
@@ -153,12 +121,9 @@ const PRESETS = [
     endTime: "16:00",
     colorClass:
       "bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700",
-    description: "Preko 30 dana - naknada na teret zdravstvenog fonda RFZO",
   },
   {
     code: "P",
-    label: "P (+OT)",
-    fullTitle: "Prekovremeni rad (+26%)",
     dayHours: 8,
     nightHours: 0,
     overtimeHours: 4,
@@ -166,10 +131,9 @@ const PRESETS = [
     endTime: "20:00",
     colorClass:
       "bg-red-100 dark:bg-red-950/70 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700",
-    description:
-      "Rad preko punog radnog vremena sa uvećanjem od minimum 26%",
   },
 ];
+
 export const WorkerCalendarOverrideModal = ({
   employee,
   date,
@@ -178,6 +142,7 @@ export const WorkerCalendarOverrideModal = ({
   onClose,
   onSave,
 }) => {
+  const { t, intlLocale } = useLanguage();
   const [selectedCode, setSelectedCode] = useState(
     existingOverride?.code || "R",
   );
@@ -200,12 +165,22 @@ export const WorkerCalendarOverrideModal = ({
   const [customOvertimeHours, setCustomOvertimeHours] = useState(
     existingOverride?.overtimeHours ?? 0,
   );
-  const dateFormatted = new Date(date).toLocaleDateString("sr-RS", {
+  const dateFormatted = new Date(date).toLocaleDateString(intlLocale, {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+
+  const presets = PRESET_DEFS.map((p) => ({
+    ...p,
+    ...(t.ui.overrideModal.presets[p.code] || {
+      label: p.code,
+      fullTitle: p.code,
+      description: "",
+    }),
+  }));
+
   const handleSelectPreset = (p) => {
     setSelectedCode(p.code);
     setCustomStartTime(p.startTime);
@@ -214,12 +189,16 @@ export const WorkerCalendarOverrideModal = ({
     setCustomNightHours(p.nightHours);
     setCustomOvertimeHours(p.overtimeHours);
     if (!doznakaBroj) {
-      if (p.code === "GO") setDoznakaBroj(`REŠ-GO-${new Date().getFullYear()}/01`);
-      else if (["B", "B100", "RFZO"].includes(p.code)) setDoznakaBroj(`DZ-${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`);
+      if (p.code === "GO")
+        setDoznakaBroj(`GO-${new Date().getFullYear()}/01`);
+      else if (["B", "B100", "RFZO"].includes(p.code))
+        setDoznakaBroj(
+          `DZ-${new Date().getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
+        );
     }
   };
   const handleSave = () => {
-    const preset = PRESETS.find((p) => p.code === selectedCode);
+    const preset = presets.find((p) => p.code === selectedCode);
     const label = preset?.label || selectedCode;
     const isLeave = ["GO", "B", "B100", "RFZO"].includes(selectedCode);
     const hoursNum = Number(customDayHours) || 8;
@@ -229,7 +208,7 @@ export const WorkerCalendarOverrideModal = ({
       label,
       startTime: customStartTime,
       endTime: customEndTime,
-      dayHours: isLeave ? 0 : (Number(customDayHours) || 0),
+      dayHours: isLeave ? 0 : Number(customDayHours) || 0,
       vacationHours: selectedCode === "GO" ? hoursNum : 0,
       sickHours: ["B", "B100", "RFZO"].includes(selectedCode) ? hoursNum : 0,
       leaveType:
@@ -277,7 +256,7 @@ export const WorkerCalendarOverrideModal = ({
                 <FileEdit className="w-4 h-4" />
               </span>
               <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                Manuelna prepravka smene u kalendaru
+                {t.ui.overrideModal.title}
               </h3>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -309,7 +288,7 @@ export const WorkerCalendarOverrideModal = ({
               <CalendarIcon className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <div>
                 <span className="text-[10px] uppercase font-bold text-indigo-600 dark:text-indigo-400 tracking-wider block">
-                  Izabrani datum
+                  {t.ui.overrideModal.selectedDate}
                 </span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white capitalize">
                   {dateFormatted}
@@ -319,7 +298,7 @@ export const WorkerCalendarOverrideModal = ({
 
             {existingOverride && (
               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
-                Aktivna manuelna izmena
+                {t.ui.overrideModal.activeOverrideBadge}
               </span>
             )}
           </div>
@@ -327,10 +306,10 @@ export const WorkerCalendarOverrideModal = ({
           {/* Quick Preset Selector Grid */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-              Izaberite smenu ili status za ovaj dan:
+              {t.ui.overrideModal.selectPresetPrompt}
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              {PRESETS.map((p) => {
+              {presets.map((p) => {
                 const isSelected = selectedCode === p.code;
                 return (
                   <button
@@ -358,17 +337,19 @@ export const WorkerCalendarOverrideModal = ({
           <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-bold text-slate-800 dark:text-slate-200">
-                Podešavanje satnice za {selectedCode}:
+                {interpolate(t.ui.overrideModal.hourlySetupFor, {
+                  code: selectedCode,
+                })}
               </span>
               <span className="text-[11px] text-slate-500">
-                {PRESETS.find((p) => p.code === selectedCode)?.description}
+                {presets.find((p) => p.code === selectedCode)?.description}
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Početak
+                  {t.ui.overrideModal.startLabel}
                 </label>
                 <input
                   type="time"
@@ -380,7 +361,7 @@ export const WorkerCalendarOverrideModal = ({
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Kraj
+                  {t.ui.overrideModal.endLabel}
                 </label>
                 <input
                   type="time"
@@ -392,7 +373,7 @@ export const WorkerCalendarOverrideModal = ({
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 mb-1">
-                  Dnevni sati
+                  {t.ui.overrideModal.dayHoursLabel}
                 </label>
                 <input
                   type="number"
@@ -407,7 +388,7 @@ export const WorkerCalendarOverrideModal = ({
 
               <div>
                 <label className="block text-[10px] font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                  Noćni sati (+26%)
+                  {t.ui.overrideModal.nightHoursLabel}
                 </label>
                 <input
                   type="number"
@@ -426,11 +407,15 @@ export const WorkerCalendarOverrideModal = ({
           {["GO", "B", "B100", "RFZO"].includes(selectedCode) && (
             <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/30 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-1.5">
               <label className="block text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                {selectedCode === "GO" ? "Broj rešenja o godišnjem odmoru:" : "Broj lekarske doznake (DZ):"}
+                {selectedCode === "GO"
+                  ? t.ui.overrideModal.goDecisionLabel
+                  : t.ui.overrideModal.doznakaLabel}
               </label>
               <input
                 type="text"
-                placeholder={selectedCode === "GO" ? "npr. REŠ-GO-2026/01" : "npr. DZ-2026/8912"}
+                placeholder={
+                  selectedCode === "GO" ? "GO-2026/01" : "DZ-2026/8912"
+                }
                 value={doznakaBroj}
                 onChange={(e) => setDoznakaBroj(e.target.value)}
                 className="w-full p-2 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 font-mono text-xs text-slate-900 dark:text-white font-bold"
@@ -441,14 +426,14 @@ export const WorkerCalendarOverrideModal = ({
           {/* Reason / Notes */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
-              <span>Razlog manuelne izmene / Napomena za knjigovodstvo:</span>
+              <span>{t.ui.overrideModal.reasonLabel}</span>
               <span className="text-[10px] text-slate-400 font-normal">
-                Opciono
+                {t.ui.common.optional}
               </span>
             </label>
             <input
               type="text"
-              placeholder="npr. Zamena za odsutnog radnika, havarija na CNC mašini, odobren prekovremeni rad..."
+              placeholder={t.ui.overrideModal.reasonPlaceholder}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs placeholder:text-slate-400"
@@ -458,10 +443,7 @@ export const WorkerCalendarOverrideModal = ({
           {/* Statutory Notice */}
           <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-900/60 text-[11px] text-purple-900 dark:text-purple-200 flex items-start gap-2">
             <ShieldCheck className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-            <span>
-              Manuelna izmena direktno utiče na obračun ukupnih radnih sati i
-              virmane za isplatu plate. Usklađeno sa Zakonom o radu RS.
-            </span>
+            <span>{t.ui.overrideModal.statutoryNotice}</span>
           </div>
         </div>
 
@@ -475,7 +457,7 @@ export const WorkerCalendarOverrideModal = ({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-bold transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Vrati na difoltni raspored</span>
+                <span>{t.ui.overrideModal.resetDefaultBtn}</span>
               </button>
             )}
           </div>
@@ -486,7 +468,7 @@ export const WorkerCalendarOverrideModal = ({
               onClick={onClose}
               className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors cursor-pointer"
             >
-              Otkaži
+              {t.ui.common.cancel}
             </button>
             <button
               type="button"
@@ -494,7 +476,7 @@ export const WorkerCalendarOverrideModal = ({
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>Sačuvaj prepravku</span>
+              <span>{t.ui.overrideModal.saveBtn}</span>
             </button>
           </div>
         </div>

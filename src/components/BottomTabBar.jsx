@@ -1,21 +1,22 @@
 import { useShift } from "../context/ShiftContext";
 import { useLanguage } from "../i18n/LanguageContext";
-import { Handshake, Calendar, Users, Sparkles, Landmark } from "lucide-react";
+import { TrendingUp, FileSpreadsheet, Calendar, Users, Sparkles, Landmark } from "lucide-react";
 export const BottomTabBar = () => {
   const { currentTab, setCurrentTab, activeClock } = useShift();
   const { t } = useLanguage();
   const tabs = [
-    { id: "ledger", label: "Aktivni Oglasi", icon: Handshake },
+    { id: "profit-tax", label: t.ui.nav.profitTax, icon: TrendingUp },
+    { id: "ledger", label: t.ui.nav.ledger, icon: FileSpreadsheet },
     {
       id: "calendar-shifts",
-      label: "Smene & Kalendar",
+      label: t.ui.nav.calShifts,
       icon: Calendar,
       matchTabs: ["calendar-shifts", "calendar", "shifts"],
       badgeCount: activeClock ? 1 : void 0,
     },
-    { id: "bank-orders", label: "Banka & Virmani", icon: Landmark },
-    { id: "clients", label: "Dosijei Firmi", icon: Users },
-    { id: "ai-copilot", label: t.nav.aiCopilot, icon: Sparkles },
+    { id: "bank-orders", label: t.ui.nav.bankOrders, icon: Landmark },
+    { id: "clients", label: t.ui.nav.clients, icon: Users },
+    { id: "ai-copilot", label: t.ui.nav.aiCopilot, icon: Sparkles },
   ];
   return (
     <nav
@@ -23,7 +24,7 @@ export const BottomTabBar = () => {
       role="navigation"
       aria-label="Main Navigation"
     >
-      <div className="max-w-xl mx-auto grid grid-cols-5 items-center h-16 px-1">
+      <div className="max-w-2xl mx-auto grid grid-cols-6 items-center h-16 px-1">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = tab.matchTabs

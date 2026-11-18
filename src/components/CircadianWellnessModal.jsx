@@ -72,7 +72,7 @@ export const CircadianWellnessModal = ({ onClose }) => {
                 </h3>
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950 flex items-center gap-1">
                   <Crown className="w-3 h-3" />
-                  <span>PRO Feature</span>
+                  <span>{t.ui.circadian.proBadge}</span>
                 </span>
               </div>
               <p className="text-xs text-indigo-200/80 mt-0.5">
@@ -97,11 +97,10 @@ export const CircadianWellnessModal = ({ onClose }) => {
                 <Crown className="w-5 h-5 text-amber-500 shrink-0" />
                 <div className="text-xs">
                   <span className="font-bold text-amber-600 dark:text-amber-400">
-                    Premium Pro Exclusive Content
+                    {t.ui.circadian.exclusiveTitle}
                   </span>
                   <p className="text-slate-600 dark:text-slate-300 text-[11px]">
-                    Upgrade to ShiftPulse Pro to unlock live circadian timing
-                    alerts and personalised sleep window schedules.
+                    {t.ui.circadian.exclusiveDesc}
                   </p>
                 </div>
               </div>
@@ -122,7 +121,7 @@ export const CircadianWellnessModal = ({ onClose }) => {
             <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  Target Shift Rotation Context
+                  {t.ui.circadian.contextLabel}
                 </span>
                 <div className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mt-0.5">
                   {isNight ? (
@@ -134,9 +133,11 @@ export const CircadianWellnessModal = ({ onClose }) => {
                     {formatDate(nextShift.date)} ({nextShift.startTime} -{" "}
                     {nextShift.endTime})
                   </span>
-                  <span className="text-xs font-normal text-slate-500">
-                    @ {targetJob ? targetJob.name : "Work"}
-                  </span>
+                  {targetJob && (
+                    <span className="text-xs font-normal text-slate-500">
+                      @ {targetJob.name}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -145,7 +146,9 @@ export const CircadianWellnessModal = ({ onClose }) => {
               >
                 <Clock className="w-3.5 h-3.5" />
                 <span>
-                  {isNight ? "12h Night Shift Cycle" : "Day Shift Cycle"}
+                  {isNight
+                    ? t.ui.circadian.nightCycle
+                    : t.ui.circadian.dayCycle}
                 </span>
               </div>
             </div>
@@ -171,8 +174,8 @@ export const CircadianWellnessModal = ({ onClose }) => {
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   {isNight
-                    ? "Immediate morning sleep in 100% dark, cold room (18\xB0C) before cortisol peak."
-                    : "Consistent nighttime deep sleep with 7.5 hours anchor window."}
+                    ? t.ui.circadian.nightSleepDesc
+                    : t.ui.circadian.daySleepDesc}
                 </p>
               </div>
 
@@ -185,11 +188,10 @@ export const CircadianWellnessModal = ({ onClose }) => {
                   {t.premium.circadianCaffeineCutoff}
                 </div>
                 <div className="font-mono text-lg font-extrabold text-amber-600 dark:text-amber-400">
-                  {isNight ? "03:00 AM" : "14:00 PM"}
+                  {isNight ? "03:00" : "14:00"}
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Caffeine half-life is 5-7 hours. Cut off stimulants 4-5 hours
-                  before shift end to clear adenosine receptors.
+                  {t.ui.circadian.caffeineDesc}
                 </p>
               </div>
 
@@ -202,11 +204,10 @@ export const CircadianWellnessModal = ({ onClose }) => {
                   {t.premium.circadianMelatoninWindow}
                 </div>
                 <div className="font-mono text-lg font-extrabold text-sky-600 dark:text-sky-400">
-                  {isNight ? "07:15 AM Drive" : "21:00 PM"}
+                  {isNight ? "07:15" : "21:00"}
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Wear dark sunglasses during morning commute home from night
-                  shift to prevent morning sunlight from suppressing melatonin.
+                  {t.ui.circadian.melatoninDesc}
                 </p>
               </div>
             </div>
@@ -227,8 +228,8 @@ export const CircadianWellnessModal = ({ onClose }) => {
                 }
               >
                 {isHighFatigue
-                  ? "Elevated (Consecutive Nights)"
-                  : "Balanced Routine"}
+                  ? t.ui.circadian.fatigueHigh
+                  : t.ui.circadian.fatigueBalanced}
               </span>
             </div>
 

@@ -11,6 +11,7 @@ import {
 export const ShiftModal = ({ shift, defaultDate, onClose }) => {
   const { jobs, addShift, updateShift, selectedDate } = useShift();
   const { t } = useLanguage();
+  const s = t.ui.shiftModalExtra;
   const [jobId, setJobId] = useState(shift?.jobId || jobs[0]?.id || "");
   const [date, setDate] = useState(
     shift?.date ||
@@ -245,7 +246,7 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
           {/* Quick Shift Templates / Presets (8h standard & 12h turnusi) */}
           <div>
             <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
-              Brzi šabloni smena (Standardne 8h smene & 12h turnusi):
+              {s.presetsTitle}
             </span>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
               <button
@@ -255,13 +256,13 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "08:00",
                     end: "16:00",
                     midnight: false,
-                    name: "Standardno 8h radno vreme",
+                    name: s.name8hStd,
                   })
                 }
                 className="p-2 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-200 font-bold text-left truncate flex items-center gap-1.5"
               >
                 <Sun className="w-3.5 h-3.5 text-sky-500 shrink-0" />
-                <span>8h Standard (08-16)</span>
+                <span>{s.btn8hStd}</span>
               </button>
 
               <button
@@ -271,13 +272,13 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "06:00",
                     end: "14:00",
                     midnight: false,
-                    name: "I jutarnja smena 8h",
+                    name: s.name8h1,
                   })
                 }
                 className="p-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 font-bold text-left truncate flex items-center gap-1.5"
               >
                 <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>I Smena 8h (06-14)</span>
+                <span>{s.btn8h1}</span>
               </button>
 
               <button
@@ -287,13 +288,13 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "14:00",
                     end: "22:00",
                     midnight: false,
-                    name: "II popodnevna smena 8h",
+                    name: s.name8h2,
                   })
                 }
                 className="p-2 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-900 dark:text-orange-200 font-bold text-left truncate flex items-center gap-1.5"
               >
                 <Sun className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                <span>II Smena 8h (14-22)</span>
+                <span>{s.btn8h2}</span>
               </button>
 
               <button
@@ -303,13 +304,13 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "22:00",
                     end: "06:00",
                     midnight: true,
-                    name: "III no\u0107na smena 8h (+26%)",
+                    name: s.name8h3,
                   })
                 }
                 className="p-2 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-slate-900 text-indigo-200 dark:bg-indigo-950 font-bold text-left truncate flex items-center gap-1.5"
               >
                 <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>III Noćna 8h (22-06)</span>
+                <span>{s.btn8h3}</span>
               </button>
 
               <button
@@ -319,14 +320,14 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "07:00",
                     end: "19:30",
                     midnight: false,
-                    name: "12h Dnevni turnus",
+                    name: s.name12hDay,
                     is12h: true,
                   })
                 }
                 className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium text-left truncate flex items-center gap-1.5"
               >
                 <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Turnus 12h Dan</span>
+                <span>{s.btn12hDay}</span>
               </button>
 
               <button
@@ -336,14 +337,14 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     start: "19:00",
                     end: "07:30",
                     midnight: true,
-                    name: "12h No\u0107ni turnus",
+                    name: s.name12hNight,
                     is12h: true,
                   })
                 }
                 className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-medium text-left truncate flex items-center gap-1.5"
               >
                 <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                <span>Turnus 12h Noć</span>
+                <span>{s.btn12hNight}</span>
               </button>
             </div>
           </div>
@@ -510,7 +511,7 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                     type="text"
                     value={newBreakName}
                     onChange={(e) => setNewBreakName(e.target.value)}
-                    placeholder="e.g. Lunch, Incident Stand-down"
+                    placeholder={s.breakPh}
                     className="w-full p-1.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
                   />
                 </div>
@@ -595,7 +596,7 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. ICU West Wing, Depot 4"
+                placeholder={s.locationPh}
                 className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>
@@ -608,7 +609,7 @@ export const ShiftModal = ({ shift, defaultDate, onClose }) => {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                placeholder="Handover notes, specific coverage, client details..."
+                placeholder={s.notesPh}
                 className="w-full text-xs p-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
               />
             </div>

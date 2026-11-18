@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useShift } from "../context/ShiftContext";
+import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import {
   Building,
   Users,
@@ -21,6 +22,7 @@ import {
   Landmark,
   Palmtree,
   Bandage,
+  Send,
 } from "lucide-react";
 import { DocumentScanner } from "./DocumentScanner";
 import { calculateSerbianWorkerPayroll } from "../utils/payrollCalculator";
@@ -46,7 +48,12 @@ export const LedgerDashboardView = () => {
     leaveModalInitialDate,
     addWorkerLeave,
     setCurrentTab,
+    workspaceConnected,
+    saveOutputDocumentToWorkspace,
+    openCommHub,
   } = useShift();
+  const { t, intlLocale } = useLanguage();
+  const l = t.ui.ledgerFull;
   const [loadingCalculation, setLoadingCalculation] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [printTargetRadnik, setPrintTargetRadnik] = useState(null);
@@ -56,6 +63,8 @@ export const LedgerDashboardView = () => {
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [isAiScanOpen, setIsAiScanOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState(null);
+  const [confirmDeleteCompanyId, setConfirmDeleteCompanyId] = useState(null);
+  const [confirmDeleteEmpId, setConfirmDeleteEmpId] = useState(null);
   const [companyForm, setCompanyForm] = useState({
     naziv: "",
     pib: "",
@@ -134,52 +143,67 @@ export const LedgerDashboardView = () => {
     const target = employees.find((e) => e.id === employeeId);
     if (!target) return;
     try {
+      // Zero-Knowledge: obračun se vrši isključivo lokalno na uređaju korisnika
       const statutory = calculateSerbianWorkerPayroll(target);
       updateEmployee(target.id, {
         obracun: statutory,
         kompletan: true,
       });
-
-      await fetch("/api/ledger/calculate-payroll", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeId: target.id,
-          brutoBaza: target.brutoBaza,
-          satnica: target.satnica,
-          regularHours: statutory.hours.regularHours,
-          vacationHours: statutory.hours.vacationHours,
-          sickHours65: statutory.hours.sick65Hours,
-          sickHours100: statutory.hours.sick100Hours,
-          prekovremeniSati: statutory.hours.overtimeHours || target.prekovremeniSati,
-          nocniSati: statutory.hours.nightHours || target.nocniSati,
-          praznikSati: target.praznikSati,
-        }),
-      });
     } catch (err) {
       console.error(err);
     }
   };
+  const buildLocalPppPdXml = () => {
+    const periodObracuna = new Date().toISOString().slice(0, 7);
+    const stavkeXml = currentEmployees
+      .map(
+        (emp, idx) => `    <PodatakOPrihodu>
+      <RedniBroj>${idx + 1}</RedniBroj>
+      <JMBG>${emp.jmbg || "0000000000000"}</JMBG>
+      <ImePrezime>${(emp.ime || "").replace(/[<>&]/g, "")}</ImePrezime>
+      <Bruto>${(emp.obracun?.bruto || emp.brutoBaza || 0).toFixed(2)}</Bruto>
+      <Porez>${(emp.obracun?.porez || 0).toFixed(2)}</Porez>
+      <DoprinosiZaposleni>${(emp.obracun?.doprinosiRadnik || 0).toFixed(2)}</DoprinosiZaposleni>
+      <DoprinosiPoslodavac>${(emp.obracun?.doprinosiFirma || 0).toFixed(2)}</DoprinosiPoslodavac>
+    </PodatakOPrihodu>`,
+      )
+      .join("\n");
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<PodaciPoreskeDeklaracije xmlns="http://pid.purs.gov.rs">
+  <Zaglavlje>
+    <PoreskiPeriod>${periodObracuna}</PoreskiPeriod>
+    <PoreskiIdentifikacioniBroj>${activeCompany?.pib || "109876543"}</PoreskiIdentifikacioniBroj>
+    <UkupanBrojLica>${currentEmployees.length}</UkupanBrojLica>
+    <LokalniZeroKnowledgeObracun>DA</LokalniZeroKnowledgeObracun>
+  </Zaglavlje>
+  <DeklarisaniPrihodi>
+${stavkeXml}
+  </DeklarisaniPrihodi>
+</PodaciPoreskeDeklaracije>`;
+  };
   const handleDownloadXml = async () => {
     if (!activeCompany) return;
     try {
-      const response = await fetch("/api/ledger/generate-xml", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firma: activeCompany,
-          radnici: currentEmployees,
-          periodObracuna: /* @__PURE__ */ new Date().toISOString().slice(0, 7),
-        }),
-      });
-      const blob = await response.blob();
+      const xmlText = buildLocalPppPdXml();
+      const filename = `PPP-PD_${activeCompany.pib}_${new Date().toISOString().slice(0, 7)}.xml`;
+      const blob = new Blob([xmlText], { type: "application/xml;charset=utf-8" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `PPP-PD_${activeCompany.pib}_${/* @__PURE__ */ new Date().toISOString().slice(0, 7)}.xml`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      if (workspaceConnected) {
+        await saveOutputDocumentToWorkspace({
+          topFolder: "02_Izlaz_Dokumenta",
+          subFolder: "Zarade_ePorezi_XML",
+          filename,
+          content: xmlText,
+        });
+      }
     } catch (err) {
       console.error("Gre\u0161ka pri preuzimanju XML-a:", err);
     }
@@ -187,16 +211,7 @@ export const LedgerDashboardView = () => {
   const handlePreviewXml = async () => {
     if (!activeCompany) return;
     try {
-      const response = await fetch("/api/ledger/generate-xml", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firma: activeCompany,
-          radnici: currentEmployees,
-          periodObracuna: /* @__PURE__ */ new Date().toISOString().slice(0, 7),
-        }),
-      });
-      const xmlText = await response.text();
+      const xmlText = buildLocalPppPdXml();
       setGeneratedXmlString(xmlText);
       setIsXmlModalOpen(true);
     } catch (err) {
@@ -301,16 +316,17 @@ export const LedgerDashboardView = () => {
   };
   const handleExportCsv = () => {
     if (!activeCompany || currentEmployees.length === 0) return;
+    const ch = t.ui.ledger?.csvHeaders || {};
     const headers = [
-      "Ime i prezime",
-      "JMBG",
-      "Pozicija",
-      "Bruto I (RSD)",
-      "Neto Isplata (RSD)",
-      "Porez 10%",
-      "Doprinosi Radnik",
-      "Doprinosi Firma",
-      "Ukupan Tro\u0161ak Bruto II",
+      ch.worker || "Employee",
+      ch.jmbg || "JMBG",
+      ch.position || "Position",
+      ch.gross1 || "Gross I (RSD)",
+      ch.net || "Net Payout (RSD)",
+      ch.tax || "Income Tax 10% (RSD)",
+      l.colEmpContrib,
+      l.colErContrib,
+      ch.gross2 || "Gross II (RSD)",
     ];
     const rows = currentEmployees.map((e) => [
       `"${e.ime}"`,
@@ -323,19 +339,25 @@ export const LedgerDashboardView = () => {
       e.obracun ? Math.round(e.obracun.doprinosiFirma) : 0,
       e.obracun ? Math.round(e.obracun.ukupnoZaIsplatuFirme) : 0,
     ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8,\uFEFF" +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const rawCsv = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const filename = `Obracun_Zarada_${activeCompany.pib}_${/* @__PURE__ */ new Date().toISOString().slice(0, 7)}.csv`;
+    const csvContent = "data:text/csv;charset=utf-8," + rawCsv;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Obracun_Zarada_${activeCompany.pib}_${/* @__PURE__ */ new Date().toISOString().slice(0, 7)}.csv`,
-    );
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    if (workspaceConnected) {
+      saveOutputDocumentToWorkspace({
+        topFolder: "02_Izlaz_Dokumenta",
+        subFolder: "Zarade_ePorezi_XML",
+        filename,
+        content: rawCsv,
+      });
+    }
   };
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full">
@@ -343,6 +365,27 @@ export const LedgerDashboardView = () => {
       {/* SCREEN INTERFACE (Hidden during window.print A4 output)   */}
       {/* ======================================================== */}
       <div className="space-y-6 no-print">
+        {!activeCompany && (
+          <div className="bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900/60 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                {l.emptyTitle}
+              </h2>
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                {l.emptyDesc}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAddCompanyOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{l.emptyCta}</span>
+            </button>
+          </div>
+        )}
+
         {/* 1. DESKTOP WORKSTATION HEADER: COMPANY SELECTOR & CLIENT MANAGEMENT */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -354,15 +397,14 @@ export const LedgerDashboardView = () => {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white">
-                    ShiftPulse Ledger Pro
+                    {l.headerTitle}
                   </h2>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                    B2B Knjigovodstvo & ePorezi v2.4
+                  <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                    {l.badge}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Profesionalni obračunski centar za zarade, poreze i doprinose
-                  (Zakon o radu & Poreska uprava RS)
+                  {l.headerSub}
                 </p>
               </div>
             </div>
@@ -372,18 +414,23 @@ export const LedgerDashboardView = () => {
               <div className="relative min-w-[260px] flex-1 sm:flex-none">
                 <select
                   value={activeCompany?.id || ""}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    setConfirmDeleteCompanyId(null);
                     setActiveCompany(
                       companies.find((c) => c.id === e.target.value) || null,
-                    )
-                  }
+                    );
+                  }}
                   className="w-full text-xs font-bold py-2.5 pl-3 pr-8 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-xs appearance-none cursor-pointer"
                 >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.naziv} (PIB: {c.pib})
-                    </option>
-                  ))}
+                  {companies.length === 0 ? (
+                    <option value="">{l.noClientOpt}</option>
+                  ) : (
+                    companies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.naziv} (PIB: {c.pib})
+                      </option>
+                    ))
+                  )}
                 </select>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                   ▼
@@ -392,30 +439,43 @@ export const LedgerDashboardView = () => {
 
               <button
                 onClick={() => setIsAddCompanyOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors shadow-xs"
-                title="Dodaj novu firmu / klijenta u bazu"
+                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-colors shadow-xs cursor-pointer"
+                title={l.companyModalTitle}
               >
                 <Plus className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                <span>Nova Firma</span>
+                <span>{l.newClientBtn}</span>
               </button>
 
-              {activeCompany && (
-                <button
-                  onClick={() => {
-                    if (
-                      confirm(
-                        `Da li ste sigurni da \u017Eelite da uklonite firmu "${activeCompany.naziv}"?`,
-                      )
-                    ) {
-                      deleteCompany(activeCompany.id);
-                    }
-                  }}
-                  className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-800 transition-colors"
-                  title="Obriši firmu"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              {activeCompany &&
+                (confirmDeleteCompanyId === activeCompany.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        deleteCompany(activeCompany.id);
+                        setConfirmDeleteCompanyId(null);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+                    >
+                      {l.confirmDelete}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteCompanyId(null)}
+                      className="px-2.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 cursor-pointer"
+                    >
+                      {t.common.cancel}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteCompanyId(activeCompany.id)}
+                    className="p-2.5 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-slate-800 transition-colors cursor-pointer"
+                    title={l.confirmDelete}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -435,7 +495,7 @@ export const LedgerDashboardView = () => {
                 </strong>
               </div>
               <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400 truncate">
-                <span className="text-slate-400">Opština:</span>
+                <span className="text-slate-400">{l.municipalityLabel}</span>
                 <strong className="text-slate-900 dark:text-white font-bold">
                   {activeCompany.opstina_kod}
                 </strong>
@@ -444,9 +504,9 @@ export const LedgerDashboardView = () => {
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                <span className="text-slate-400">Zaposleni:</span>
+                <span className="text-slate-400">{l.headcountLabel}</span>
                 <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                  {currentEmployees.length} radnika
+                  {interpolate(l.employeesSuffix, { count: currentEmployees.length })}
                 </span>
               </div>
             </div>
@@ -455,145 +515,134 @@ export const LedgerDashboardView = () => {
 
         {/* 2. EXECUTIVE KPI CARDS: FINANCIAL ACCUMULATOR */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4">
-          {/* Card 1: Total Gross Earnings (Bruto I) */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Fond Bruto I Zarada</span>
-              <DollarSign className="w-4 h-4 text-indigo-500 opacity-70 group-hover:scale-110 transition-transform" />
+              <span>{l.kpi1Title}</span>
+              <DollarSign className="w-4 h-4 text-indigo-500 opacity-70" />
             </div>
-            <div className="mt-2 text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono">
-              RSD {Math.round(companyMetrics.ukupnoBrutoI).toLocaleString()}
+            <div className="mt-2 text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tabular-nums">
+              RSD {Math.round(companyMetrics.ukupnoBrutoI).toLocaleString(intlLocale)}
             </div>
             <div className="text-[10px] text-slate-500 mt-1">
-              Osnovica pre odbitaka i poreza
+              {l.kpi1Sub}
             </div>
           </div>
 
-          {/* Card 2: Net Payout (Neto isplata na račun) */}
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/50 shadow-sm relative overflow-hidden group bg-gradient-to-b from-white to-emerald-50/20 dark:from-slate-900 dark:to-emerald-950/10">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/50 shadow-sm relative overflow-hidden group">
             <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
-              <span>Neto Isplata Radnicima</span>
-              <TrendingUp className="w-4 h-4 text-emerald-500 opacity-70 group-hover:scale-110 transition-transform" />
+              <span>{l.kpi2Title}</span>
+              <TrendingUp className="w-4 h-4 text-emerald-500 opacity-70" />
             </div>
-            <div className="mt-2 text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
-              RSD {Math.round(companyMetrics.ukupnoNeto).toLocaleString()}
+            <div className="mt-2 text-lg sm:text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">
+              RSD {Math.round(companyMetrics.ukupnoNeto).toLocaleString(intlLocale)}
             </div>
             <div className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-              {companyMetrics.obracunatoBroj} od {companyMetrics.ukupnoRadnika}{" "}
-              obračunato
+              {interpolate(l.kpi2Sub, {
+                calc: companyMetrics.obracunatoBroj,
+                total: companyMetrics.ukupnoRadnika,
+              })}
             </div>
           </div>
 
-          {/* Card 3: Tax & Contributions (Fiskalni odbici) */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
             <div className="text-[10px] font-bold uppercase tracking-wider text-rose-500 flex items-center justify-between">
-              <span>Porez & Doprinosi Radnik</span>
-              <ShieldCheck className="w-4 h-4 text-rose-500 opacity-70 group-hover:scale-110 transition-transform" />
+              <span>{l.kpi3Title}</span>
+              <ShieldCheck className="w-4 h-4 text-rose-500 opacity-70" />
             </div>
-            <div className="mt-2 text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono">
+            <div className="mt-2 text-lg sm:text-xl font-black text-slate-900 dark:text-white font-mono tabular-nums">
               RSD{" "}
               {Math.round(
                 companyMetrics.ukupnoPorez +
                   companyMetrics.ukupnoDoprinosiRadnik,
-              ).toLocaleString()}
+              ).toLocaleString(intlLocale)}
             </div>
             <div className="text-[10px] text-slate-500 mt-1">
-              Porez 10% + PIO/ZDR/NEZ (19.9%)
+              {l.kpi3Sub}
             </div>
           </div>
 
-          {/* Card 4: Total Employer Cost (Bruto II / Super-bruto) */}
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/50 shadow-sm relative overflow-hidden group bg-gradient-to-b from-white to-indigo-50/20 dark:from-slate-900 dark:to-indigo-950/10">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-900/50 shadow-sm relative overflow-hidden group">
             <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center justify-between">
-              <span>Ukupan Trošak Firme (Bruto II)</span>
-              <Building className="w-4 h-4 text-indigo-500 opacity-70 group-hover:scale-110 transition-transform" />
+              <span>{l.kpi4Title}</span>
+              <Building className="w-4 h-4 text-indigo-500 opacity-70" />
             </div>
-            <div className="mt-2 text-lg sm:text-xl font-black text-indigo-700 dark:text-indigo-300 font-mono">
-              RSD {Math.round(companyMetrics.ukupnoBrutoII).toLocaleString()}
+            <div className="mt-2 text-lg sm:text-xl font-black text-indigo-700 dark:text-indigo-300 font-mono tabular-nums">
+              RSD {Math.round(companyMetrics.ukupnoBrutoII).toLocaleString(intlLocale)}
             </div>
             <div className="text-[10px] text-indigo-600/80 dark:text-indigo-400/80 mt-1">
-              Uključuje doprinose firme (15.15%)
+              {l.kpi4Sub}
             </div>
           </div>
         </div>
 
         {/* 3. DESKTOP ACTION BAR & WORKFLOW BUTTONS */}
         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Input */}
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pretraži radnika po imenu, JMBG ili poziciji..."
+              placeholder={l.searchPh}
               className="w-full text-xs pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
-          {/* Action Button Strip */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Run Bulk Payroll */}
             <button
               onClick={handleRunBulkPayroll}
               disabled={loadingCalculation || currentEmployees.length === 0}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl shadow-md transition-all disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${loadingCalculation ? "animate-spin" : ""}`}
               />
               <span>
-                {loadingCalculation
-                  ? "Obra\u010Dunavanje..."
-                  : "\u26A1 Pokreni masovni obra\u010Dun"}
+                {loadingCalculation ? l.calculatingBtn : l.runBulkBtn}
               </span>
             </button>
 
-            {/* ePorezi XML Download */}
             <button
               onClick={handleDownloadXml}
               disabled={companyMetrics.obracunatoBroj === 0}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs font-bold transition-colors disabled:opacity-40"
-              title="Preuzmi validiran XML fajl za uvoz u ePorezi (PPP-PD prijava)"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-300 dark:border-amber-800 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 cursor-pointer"
+              title={l.pppPdTitle}
             >
               <FileCode className="w-4 h-4 text-amber-600" />
-              <span>PPP-PD XML</span>
+              <span>{l.pppPdBtn}</span>
             </button>
 
-            {/* Bank Payment Orders & Virmani */}
             <button
               onClick={() => setCurrentTab("bank-orders")}
               className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-700 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-              title="Automatska izrada naloga za banku i virmana na osnovu obračunate satnice"
+              title={l.bankOrdersTitle}
             >
               <Landmark className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>🏦 Nalozi za Banku (Virmani)</span>
+              <span>{l.bankOrdersBtn}</span>
             </button>
 
-            {/* XML Preview */}
             <button
               onClick={handlePreviewXml}
               disabled={companyMetrics.obracunatoBroj === 0}
-              className="flex items-center gap-1.5 px-3 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors disabled:opacity-40"
-              title="Pregledaj strukturu XML koda"
+              className="flex items-center gap-1.5 px-3 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer"
+              title={l.xmlPreviewTitle}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Pregled XML</span>
+              <span className="hidden sm:inline">{l.previewXmlBtn}</span>
             </button>
 
-            {/* CSV Export */}
             <button
               onClick={handleExportCsv}
               disabled={currentEmployees.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors disabled:opacity-40"
-              title="Izvoz u Excel kompatibilan CSV"
+              className="flex items-center gap-1.5 px-3 py-2.5 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer"
+              title={l.excelCsvBtn}
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Excel CSV</span>
+              <span className="hidden sm:inline">{l.excelCsvBtn}</span>
             </button>
 
-            {/* Add Employee */}
             <button
+              disabled={!activeCompany}
               onClick={() => {
                 setEditingEmp(null);
                 setEmpForm({
@@ -610,44 +659,53 @@ export const LedgerDashboardView = () => {
                 });
                 setIsAddEmployeeOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl text-xs font-bold transition-all shadow-xs"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 rounded-xl text-xs font-bold transition-all shadow-xs disabled:opacity-40 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Novi Radnik</span>
+              <span>{l.addEmpBtn}</span>
             </button>
 
-            {/* AI Document Scan Batch */}
             <button
               onClick={() => setIsAiScanOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs"
-              title="Skeniraj papirni ugovor ili platnu listu kamerom ili PDF-om"
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-xs font-bold hover:opacity-90 transition-opacity shadow-xs cursor-pointer"
+              title={l.aiScannerModalTitle}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">AI Ugovor</span>
+              <span className="hidden sm:inline">{l.aiContractBtn}</span>
+            </button>
+
+            <button
+              onClick={() => openCommHub("email", "payroll")}
+              disabled={!activeCompany}
+              className="flex items-center gap-1.5 px-3 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+              title={l.sendClientBtn}
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{l.sendClientBtn}</span>
             </button>
           </div>
         </div>
 
-        {/* 4. MAIN BOOKKEEPING LEDGER TABLE (RIGOROUS & SCANNABLE) */}
+        {/* 4. MAIN BOOKKEEPING LEDGER TABLE */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono min-w-[1100px]">
               <thead className="bg-slate-50/80 dark:bg-slate-800/60 text-slate-500 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800 py-3.5">
                 <tr>
-                  <th className="p-3.5">Zaposleni / JMBG</th>
-                  <th className="p-3.5">Pozicija & Račun</th>
-                  <th className="p-3.5 text-center">Smenski Parametri</th>
-                  <th className="p-3.5 text-right">Osnovni Bruto</th>
+                  <th className="p-3.5">{l.colEmpJmbg}</th>
+                  <th className="p-3.5">{l.colRoleBank}</th>
+                  <th className="p-3.5 text-center">{l.colShiftParams}</th>
+                  <th className="p-3.5 text-right">{l.colBaseGross}</th>
                   <th className="p-3.5 text-right font-sans font-bold text-emerald-600">
-                    Neto Isplata
+                    {l.colNetPayout}
                   </th>
-                  <th className="p-3.5 text-right">Porez (10%)</th>
-                  <th className="p-3.5 text-right">Doprinosi Radnik (19.9%)</th>
-                  <th className="p-3.5 text-right">Doprinosi Firma (15.15%)</th>
+                  <th className="p-3.5 text-right">{l.colTax10}</th>
+                  <th className="p-3.5 text-right">{l.colEmpContrib}</th>
+                  <th className="p-3.5 text-right">{l.colErContrib}</th>
                   <th className="p-3.5 text-right font-bold text-indigo-600">
-                    Ukupan Trošak (Bruto II)
+                    {l.colTotalGross2}
                   </th>
-                  <th className="p-3.5 text-center">Akcije</th>
+                  <th className="p-3.5 text-center">{l.colActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -657,8 +715,7 @@ export const LedgerDashboardView = () => {
                       colSpan={10}
                       className="p-8 text-center text-slate-400 font-sans"
                     >
-                      Nema pronađenih radnika za odabranu firmu. Kliknite na "+
-                      Novi Radnik" ili "AI Ugovor" za masovni unos.
+                      {l.emptyWorkers}
                     </td>
                   </tr>
                 ) : (
@@ -669,7 +726,6 @@ export const LedgerDashboardView = () => {
                         key={r.id}
                         className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                       >
-                        {/* Employee Name & JMBG */}
                         <td className="p-3.5 font-sans">
                           <div className="flex items-center gap-2">
                             <span
@@ -686,67 +742,58 @@ export const LedgerDashboardView = () => {
                           </div>
                         </td>
 
-                        {/* Role & Bank Account */}
                         <td className="p-3.5 font-sans">
                           <div className="font-medium text-slate-700 dark:text-slate-300 text-[11px] truncate max-w-[160px]">
                             {r.pozicija}
                           </div>
                           <div className="text-[10px] text-slate-400 font-mono truncate max-w-[160px]">
-                            {r.bankRacun || "Nije unet ra\u010Dun"}
+                            {r.bankRacun || l.noBankAcc}
                           </div>
                         </td>
 
-                        {/* Hours breakdown: OT, Night, Holiday, GO, Sick Leave */}
                         <td className="p-3.5 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-[10px] font-mono">
-                              <span title="Satnica">{r.satnica} RSD/h</span>
-                              <span className="text-slate-300 dark:text-slate-600">
-                                |
-                              </span>
+                              <span title={l.hourlyRateLabel}>{r.satnica} RSD/h</span>
+                              <span className="text-slate-300 dark:text-slate-600">|</span>
                               <span
                                 className="text-amber-600 dark:text-amber-400"
-                                title="Prekovremeni sati (+26%)"
+                                title={l.otLabel}
                               >
-                                OT:{r.obracun?.hours?.overtimeHours ?? r.prekovremeniSati}h
+                                {l.otShort}:{r.obracun?.hours?.overtimeHours ?? r.prekovremeniSati}h
                               </span>
-                              <span className="text-slate-300 dark:text-slate-600">
-                                |
-                              </span>
+                              <span className="text-slate-300 dark:text-slate-600">|</span>
                               <span
                                 className="text-indigo-600 dark:text-indigo-400"
-                                title="Noćni rad (+26%)"
+                                title={l.nightLabel}
                               >
-                                Noć:{r.obracun?.hours?.nightHours ?? r.nocniSati}h
+                                {l.nightShort}:{r.obracun?.hours?.nightHours ?? r.nocniSati}h
                               </span>
                               {r.praznikSati > 0 && (
                                 <>
-                                  <span className="text-slate-300 dark:text-slate-600">
-                                    |
-                                  </span>
+                                  <span className="text-slate-300 dark:text-slate-600">|</span>
                                   <span
                                     className="text-rose-600"
-                                    title="Praznik (+110%)"
+                                    title={l.holLabel}
                                   >
-                                    Praz:{r.praznikSati}h
+                                    {l.holShort}:{r.praznikSati}h
                                   </span>
                                 </>
                               )}
                             </div>
 
-                            {/* Vacation & Sick Leave badges if recorded */}
                             {(r.obracun?.hours?.vacationHours > 0 || (r.obracun?.hours?.sick65Hours || 0) + (r.obracun?.hours?.sick100Hours || 0) > 0) && (
                               <div className="flex items-center gap-1.5 text-[9px] font-bold">
                                 {r.obracun?.hours?.vacationHours > 0 && (
                                   <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
                                     <Palmtree className="w-2.5 h-2.5 text-amber-600" />
-                                    GO: {r.obracun.hours.vacationHours}h
+                                    {l.leaveTag}: {r.obracun.hours.vacationHours}h
                                   </span>
                                 )}
                                 {((r.obracun?.hours?.sick65Hours || 0) + (r.obracun?.hours?.sick100Hours || 0) > 0) && (
                                   <span className="px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
                                     <Bandage className="w-2.5 h-2.5 text-rose-600" />
-                                    Bolovanje: {(r.obracun?.hours?.sick65Hours || 0) + (r.obracun?.hours?.sick100Hours || 0)}h
+                                    {l.sickTag}: {(r.obracun?.hours?.sick65Hours || 0) + (r.obracun?.hours?.sick100Hours || 0)}h
                                   </span>
                                 )}
                               </div>
@@ -754,101 +801,99 @@ export const LedgerDashboardView = () => {
                           </div>
                         </td>
 
-                        {/* Base Gross */}
-                        <td className="p-3.5 text-right font-medium text-slate-900 dark:text-slate-200">
-                          RSD {r.brutoBaza.toLocaleString()}
+                        <td className="p-3.5 text-right font-medium text-slate-900 dark:text-slate-200 tabular-nums">
+                          RSD {r.brutoBaza.toLocaleString(intlLocale)}
                         </td>
 
-                        {/* Net Pay */}
-                        <td className="p-3.5 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                        <td className="p-3.5 text-right font-black text-emerald-600 dark:text-emerald-400 text-sm tabular-nums">
                           {hasCalc ? (
-                            `RSD ${Math.round(r.obracun.neto).toLocaleString()}`
+                            `RSD ${Math.round(r.obracun.neto).toLocaleString(intlLocale)}`
                           ) : (
                             <span className="text-xs text-amber-500 font-sans font-semibold">
-                              Čeka obračun
+                              {l.pendingStatus}
                             </span>
                           )}
                         </td>
 
-                        {/* Wage Tax 10% */}
-                        <td className="p-3.5 text-right text-rose-500">
+                        <td className="p-3.5 text-right text-rose-500 tabular-nums">
                           {hasCalc
-                            ? `RSD ${Math.round(r.obracun.porez).toLocaleString()}`
+                            ? `RSD ${Math.round(r.obracun.porez).toLocaleString(intlLocale)}`
                             : "---"}
                         </td>
 
-                        {/* Employee Contributions */}
-                        <td className="p-3.5 text-right text-amber-600 dark:text-amber-400">
+                        <td className="p-3.5 text-right text-amber-600 dark:text-amber-400 tabular-nums">
                           {hasCalc
-                            ? `RSD ${Math.round(r.obracun.doprinosiRadnik).toLocaleString()}`
+                            ? `RSD ${Math.round(r.obracun.doprinosiRadnik).toLocaleString(intlLocale)}`
                             : "---"}
                         </td>
 
-                        {/* Employer Contributions */}
-                        <td className="p-3.5 text-right text-blue-500">
+                        <td className="p-3.5 text-right text-blue-500 tabular-nums">
                           {hasCalc
-                            ? `RSD ${Math.round(r.obracun.doprinosiFirma).toLocaleString()}`
+                            ? `RSD ${Math.round(r.obracun.doprinosiFirma).toLocaleString(intlLocale)}`
                             : "---"}
                         </td>
 
-                        {/* Total Cost (Bruto II) */}
-                        <td className="p-3.5 text-right font-black text-indigo-600 dark:text-indigo-400">
+                        <td className="p-3.5 text-right font-black text-indigo-600 dark:text-indigo-400 tabular-nums">
                           {hasCalc
-                            ? `RSD ${Math.round(r.obracun.ukupnoZaIsplatuFirme).toLocaleString()}`
+                            ? `RSD ${Math.round(r.obracun.ukupnoZaIsplatuFirme).toLocaleString(intlLocale)}`
                             : "---"}
                         </td>
 
-                        {/* Actions */}
                         <td className="p-3.5 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            {/* Leave & Vacation Modal Trigger */}
                             <button
                               onClick={() => openLeaveModal(r.id)}
                               className="p-1.5 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
-                              title="Unesi bolovanje ili godišnji odmor radniku"
+                              title={l.btnLeaveTitle}
                             >
                               <Palmtree className="w-3.5 h-3.5 text-amber-600" />
                             </button>
 
-                            {/* Calculate Button */}
                             <button
                               onClick={() => handleCalculateSingle(r.id)}
                               className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
-                              title="Obračunaj ovog radnika"
+                              title={l.btnCalcTitle}
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Print Payslip */}
                             <button
                               onClick={() => handlePrintPayslip(r)}
                               disabled={!hasCalc}
                               className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors disabled:opacity-30 cursor-pointer"
-                              title="Štampaj službeni obračunski listić zarade (A4 / PDF)"
+                              title={l.btnPrintTitle}
                             >
                               <Printer className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Edit */}
                             <button
                               onClick={() => handleStartEdit(r)}
                               className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
-                              title="Izmeni parametre radnika"
+                              title={l.btnEditTitle}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* Delete */}
-                            <button
-                              onClick={() => {
-                                if (confirm(`Ukloniti radnika ${r.ime}?`))
+                            {confirmDeleteEmpId === r.id ? (
+                              <button
+                                onClick={() => {
                                   deleteEmployee(r.id);
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                              title="Obriši"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                                  setConfirmDeleteEmpId(null);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-bold cursor-pointer"
+                                title={l.confirmRemoveBtn}
+                              >
+                                {l.confirmRemoveBtn}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteEmpId(r.id)}
+                                className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title={l.btnDeleteTitle}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -877,33 +922,33 @@ export const LedgerDashboardView = () => {
                 {activeCompany.adresa}
               </p>
               <p className="text-[11px] font-mono mt-0.5">
-                PIB: <strong>{activeCompany.pib}</strong> | Matični broj:{" "}
+                {l.pibLabel}: <strong>{activeCompany.pib}</strong> | {l.mbLabel}:{" "}
                 <strong>{activeCompany.maticniBroj}</strong>
               </p>
               {activeCompany.iban && (
                 <p className="text-[10px] font-mono text-gray-600">
-                  Tekući račun: {activeCompany.iban}
+                  {l.ibanLabel}: {activeCompany.iban}
                 </p>
               )}
             </div>
             <div className="text-right">
               <span className="text-[10px] font-bold uppercase tracking-wider block text-gray-500">
-                Obrazac OZ-1 (PURS)
+                {l.slipFormLabel}
               </span>
               <div className="text-sm font-black text-black uppercase mt-1">
-                Obračunski list zarade
+                {l.slipDocTitle}
               </div>
               <div className="text-[11px] font-mono">
-                Period:{" "}
+                {l.slipPeriod}{" "}
                 <strong>
                   {/* @__PURE__ */ new Date()
-                    .toLocaleString("sr-RS", { month: "long", year: "numeric" })
+                    .toLocaleString(intlLocale, { month: "long", year: "numeric" })
                     .toUpperCase()}
                 </strong>
               </div>
               <div className="text-[10px] text-gray-500">
-                Datum obračuna:{" "}
-                {/* @__PURE__ */ new Date().toLocaleDateString("sr-RS")}
+                {l.slipCalcDate}{" "}
+                {/* @__PURE__ */ new Date().toLocaleDateString(intlLocale)}
               </div>
             </div>
           </div>
@@ -912,7 +957,7 @@ export const LedgerDashboardView = () => {
           <div className="bg-gray-50 border border-gray-300 p-3.5 rounded-lg grid grid-cols-2 gap-4">
             <div>
               <div className="text-[10px] uppercase font-bold text-gray-500">
-                Zaposleni (Primalac):
+                {l.slipWorkerHeading}
               </div>
               <div className="text-sm font-black text-black">
                 {printTargetRadnik.ime}
@@ -921,25 +966,25 @@ export const LedgerDashboardView = () => {
                 {printTargetRadnik.pozicija}
               </div>
               <div className="text-[10px] font-mono mt-0.5 text-gray-600">
-                Tekući račun: {printTargetRadnik.bankRacun || "Po vi\u0111enju"}
+                {l.bankAccLabel}: {printTargetRadnik.bankRacun || l.noBankAcc}
               </div>
             </div>
             <div>
               <div className="text-[10px] uppercase font-bold text-gray-500">
-                Identifikacione oznake:
+                {l.slipIdHeading}
               </div>
               <div className="text-[11px] font-mono">
                 JMBG: <strong>{printTargetRadnik.jmbg}</strong>
               </div>
               <div className="text-[11px] font-mono">
-                Šifra opštine:{" "}
+                {l.slipMuniCode}{" "}
                 <strong>
                   {printTargetRadnik.opstinaPrebivalista ||
                     activeCompany.opstina_kod}
                 </strong>
               </div>
               <div className="text-[11px] font-mono">
-                Šifra vrste prihoda (SVP): <strong>101000</strong> (Zarada)
+                {l.slipSvp}
               </div>
             </div>
           </div>
@@ -947,39 +992,42 @@ export const LedgerDashboardView = () => {
           {/* Finansijska specifikacija - 1. BRUTO */}
           <div className="space-y-1">
             <div className="font-bold text-black border-b border-gray-400 pb-1 uppercase tracking-wide">
-              1. Specifikacija bruto zarade i uvećanja (Zakon o radu RS)
+              {l.slipSec1}
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>Osnovna ugovorena zarada (bruto):</span>
+              <span>{l.slipBaseGross}</span>
               <span className="text-right font-mono">
-                RSD {printTargetRadnik.brutoBaza.toLocaleString()}.00
+                RSD {printTargetRadnik.brutoBaza.toLocaleString(intlLocale)}.00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
               <span>
-                Uvećanje za prekovremeni rad (+26% /{" "}
-                {printTargetRadnik.prekovremeniSati}h):
+                {interpolate(l.slipOtLine, {
+                  h: printTargetRadnik.prekovremeniSati,
+                })}
               </span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.uvecanja.prekovremeniRad,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
               <span>
-                Uvećanje za noćni rad (+26% / {printTargetRadnik.nocniSati}h):
+                {interpolate(l.slipNightLine, {
+                  h: printTargetRadnik.nocniSati,
+                })}
               </span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.uvecanja.nocniRad,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
@@ -987,15 +1035,16 @@ export const LedgerDashboardView = () => {
             {printTargetRadnik.praznikSati > 0 && (
               <div className="grid grid-cols-2 py-1 border-b border-gray-200">
                 <span>
-                  Uvećanje za rad na državni praznik (+110% /{" "}
-                  {printTargetRadnik.praznikSati}h):
+                  {interpolate(l.slipHolLine, {
+                    h: printTargetRadnik.praznikSati,
+                  })}
                 </span>
                 <span className="text-right font-mono">
                   RSD{" "}
                   {printTargetRadnik.obracun
                     ? Math.round(
                         printTargetRadnik.obracun.uvecanja.praznicniRad,
-                      ).toLocaleString()
+                      ).toLocaleString(intlLocale)
                     : "0"}
                   .00
                 </span>
@@ -1004,14 +1053,15 @@ export const LedgerDashboardView = () => {
             {printTargetRadnik.obracun?.naknade?.godisnjiOdmor > 0 && (
               <div className="grid grid-cols-2 py-1 border-b border-gray-200 text-amber-900 bg-amber-50/50">
                 <span>
-                  Naknada zarade za godišnji odmor (čl. 114 ZOR - 100% /{" "}
-                  {printTargetRadnik.obracun.hours?.vacationHours || 0}h):
+                  {interpolate(l.slipVacLine, {
+                    h: printTargetRadnik.obracun.hours?.vacationHours || 0,
+                  })}
                 </span>
                 <span className="text-right font-mono font-bold">
                   RSD{" "}
                   {Math.round(
                     printTargetRadnik.obracun.naknade.godisnjiOdmor,
-                  ).toLocaleString()}
+                  ).toLocaleString(intlLocale)}
                   .00
                 </span>
               </div>
@@ -1019,14 +1069,15 @@ export const LedgerDashboardView = () => {
             {printTargetRadnik.obracun?.naknade?.bolovanje65 > 0 && (
               <div className="grid grid-cols-2 py-1 border-b border-gray-200 text-rose-900 bg-rose-50/50">
                 <span>
-                  Naknada zarade za bolovanje do 30 dana (čl. 115 ZOR - 65% /{" "}
-                  {printTargetRadnik.obracun.hours?.sick65Hours || 0}h):
+                  {interpolate(l.slipSick65Line, {
+                    h: printTargetRadnik.obracun.hours?.sick65Hours || 0,
+                  })}
                 </span>
                 <span className="text-right font-mono font-bold">
                   RSD{" "}
                   {Math.round(
                     printTargetRadnik.obracun.naknade.bolovanje65,
-                  ).toLocaleString()}
+                  ).toLocaleString(intlLocale)}
                   .00
                 </span>
               </div>
@@ -1034,25 +1085,26 @@ export const LedgerDashboardView = () => {
             {printTargetRadnik.obracun?.naknade?.bolovanje100 > 0 && (
               <div className="grid grid-cols-2 py-1 border-b border-gray-200 text-rose-900 bg-rose-50/50">
                 <span>
-                  Naknada zarade za bolovanje - povreda na radu (čl. 115 ZOR - 100% /{" "}
-                  {printTargetRadnik.obracun.hours?.sick100Hours || 0}h):
+                  {interpolate(l.slipSick100Line, {
+                    h: printTargetRadnik.obracun.hours?.sick100Hours || 0,
+                  })}
                 </span>
                 <span className="text-right font-mono font-bold">
                   RSD{" "}
                   {Math.round(
                     printTargetRadnik.obracun.naknade.bolovanje100,
-                  ).toLocaleString()}
+                  ).toLocaleString(intlLocale)}
                   .00
                 </span>
               </div>
             )}
             <div className="grid grid-cols-2 py-1.5 font-bold bg-gray-100 px-2 rounded">
-              <span>UKUPNO OSTVARENA BRUTO ZARADA (BRUTO I):</span>
+              <span>{l.slipTotalGross1}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
-                  ? Math.round(printTargetRadnik.obracun.bruto).toLocaleString()
-                  : printTargetRadnik.brutoBaza.toLocaleString()}
+                  ? Math.round(printTargetRadnik.obracun.bruto).toLocaleString(intlLocale)
+                  : printTargetRadnik.brutoBaza.toLocaleString(intlLocale)}
                 .00
               </span>
             </div>
@@ -1061,71 +1113,69 @@ export const LedgerDashboardView = () => {
           {/* 2. ODBICI NA TERET ZAPOSLENOG */}
           <div className="space-y-1">
             <div className="font-bold text-black border-b border-gray-400 pb-1 uppercase tracking-wide">
-              2. Porez i doprinosi na teret zaposlenog
+              {l.slipSec2}
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200 text-gray-700">
-              <span>Zakonski neoporezivi iznos osnovice (odbijeno):</span>
+              <span>{l.slipNonTaxable}</span>
               <span className="text-right font-mono">- RSD 25,000.00</span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>Porez na zarade (10% na oporezivu osnovicu):</span>
+              <span>{l.slipTax10}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
-                  ? Math.round(printTargetRadnik.obracun.porez).toLocaleString()
+                  ? Math.round(printTargetRadnik.obracun.porez).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>
-                Doprinos za penzijsko i invalidsko osiguranje (PIO 14.00%):
-              </span>
+              <span>{l.slipPioEmp}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.detaljiDoprinosa.pioRadnik,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>Doprinos za zdravstveno osiguranje (5.15%):</span>
+              <span>{l.slipHealthEmp}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.detaljiDoprinosa
                         .zdravstvoRadnik,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>Doprinos za osiguranje od nezaposlenosti (0.75%):</span>
+              <span>{l.slipUnempEmp}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.detaljiDoprinosa
                         .nezaposlenostRadnik,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1.5 font-bold bg-gray-100 px-2 rounded">
-              <span>UKUPNI ZAKONSKI ODBICI OD BRUTO ZARADE:</span>
+              <span>{l.slipTotalDeductions}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.doprinosiRadnik +
                         printTargetRadnik.obracun.porez,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
@@ -1136,16 +1186,16 @@ export const LedgerDashboardView = () => {
           <div className="border-2 border-black p-4 rounded-xl flex items-center justify-between bg-gray-50">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-gray-700">
-                Neto zarada za isplatu (Na tekući račun radnika)
+                {l.slipNetTitle}
               </div>
               <div className="text-[11px] text-gray-500">
-                Iznos koji se nalogom za prenos uplaćuje zaposlenom
+                {l.slipNetSub}
               </div>
             </div>
             <div className="text-2xl font-black font-mono">
               RSD{" "}
               {printTargetRadnik.obracun
-                ? Math.round(printTargetRadnik.obracun.neto).toLocaleString()
+                ? Math.round(printTargetRadnik.obracun.neto).toLocaleString(intlLocale)
                 : "0"}
               .00
             </div>
@@ -1154,41 +1204,41 @@ export const LedgerDashboardView = () => {
           {/* 4. TROŠAK POSLODAVCA (Bruto II) */}
           <div className="space-y-1 text-gray-700">
             <div className="font-bold text-black border-b border-gray-400 pb-1 uppercase tracking-wide">
-              3. Doprinosi na teret poslodavca (Dodatni fiskalni trošak firme)
+              {l.slipSec3}
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>PIO na teret poslodavca (10.00%):</span>
+              <span>{l.slipPioEr}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.detaljiDoprinosa.pioPoslodavac,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1 border-b border-gray-200">
-              <span>Zdravstvo na teret poslodavca (5.15%):</span>
+              <span>{l.slipHealthEr}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.detaljiDoprinosa
                         .zdravstvoPoslodavac,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
             </div>
             <div className="grid grid-cols-2 py-1.5 font-bold bg-gray-100 px-2 rounded text-black">
-              <span>UKUPAN TROŠAK ZARADE ZA POSLODAVCA (BRUTO II):</span>
+              <span>{l.slipTotalGross2}</span>
               <span className="text-right font-mono">
                 RSD{" "}
                 {printTargetRadnik.obracun
                   ? Math.round(
                       printTargetRadnik.obracun.ukupnoZaIsplatuFirme,
-                    ).toLocaleString()
+                    ).toLocaleString(intlLocale)
                   : "0"}
                 .00
               </span>
@@ -1198,18 +1248,18 @@ export const LedgerDashboardView = () => {
           {/* Potpisi i M.P. */}
           <div className="pt-10 flex justify-between items-end text-center">
             <div className="space-y-12">
-              <div className="text-[11px] text-gray-500">M.P.</div>
+              <div className="text-[11px] text-gray-500">{l.slipMp}</div>
               <div className="border-t border-black w-48 pt-1 text-[11px] font-bold">
-                Odgovorno lice / Knjigovođa
+                {l.slipSignEmployer}
               </div>
             </div>
             <div className="space-y-12">
               <div className="text-[11px] text-gray-500">
-                Primio dana:{" "}
-                {/* @__PURE__ */ new Date().toLocaleDateString("sr-RS")}
+                {l.slipReceivedDate}{" "}
+                {/* @__PURE__ */ new Date().toLocaleDateString(intlLocale)}
               </div>
               <div className="border-t border-black w-48 pt-1 text-[11px] font-bold">
-                Potpis zaposlenog
+                {l.slipSignWorker}
               </div>
             </div>
           </div>
@@ -1217,7 +1267,7 @@ export const LedgerDashboardView = () => {
       )}
 
       {/* ======================================================== */}
-      {/* 6. MODAL: NOVA FIRMA (KLIJENT)                           */}
+      {/* 6. MODAL: NEW CLIENT COMPANY                              */}
       {/* ======================================================== */}
       {isAddCompanyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
@@ -1226,7 +1276,7 @@ export const LedgerDashboardView = () => {
               <div className="flex items-center gap-2">
                 <Building className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Dodaj novu firmu / klijenta
+                  {l.companyModalTitle}
                 </h3>
               </div>
               <button
@@ -1243,12 +1293,12 @@ export const LedgerDashboardView = () => {
             >
               <div>
                 <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                  Puni naziv pravnog lica
+                  {l.companyNameLabel}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="npr. Adria Metalurgija d.o.o."
+                  placeholder={l.companyNamePh}
                   value={companyForm.naziv}
                   onChange={(e) =>
                     setCompanyForm({ ...companyForm, naziv: e.target.value })
@@ -1260,13 +1310,13 @@ export const LedgerDashboardView = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    PIB (Poreski broj)
+                    {l.pibLabel}
                   </label>
                   <input
                     type="text"
                     required
                     maxLength={9}
-                    placeholder="npr. 109876543"
+                    placeholder="109876543"
                     value={companyForm.pib}
                     onChange={(e) =>
                       setCompanyForm({ ...companyForm, pib: e.target.value })
@@ -1276,13 +1326,13 @@ export const LedgerDashboardView = () => {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Matični broj (MB)
+                    {l.mbLabel}
                   </label>
                   <input
                     type="text"
                     required
                     maxLength={8}
-                    placeholder="npr. 08765432"
+                    placeholder="08765432"
                     value={companyForm.maticniBroj}
                     onChange={(e) =>
                       setCompanyForm({
@@ -1297,11 +1347,11 @@ export const LedgerDashboardView = () => {
 
               <div>
                 <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                  Sedište i adresa
+                  {l.addressLabel}
                 </label>
                 <input
                   type="text"
-                  placeholder="npr. Kneza Miloša 45, 11000 Beograd"
+                  placeholder={l.addressPh}
                   value={companyForm.adresa}
                   onChange={(e) =>
                     setCompanyForm({ ...companyForm, adresa: e.target.value })
@@ -1313,7 +1363,7 @@ export const LedgerDashboardView = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Šifra opštine (PURS)
+                    {l.muniCodeLabel}
                   </label>
                   <input
                     type="text"
@@ -1331,7 +1381,7 @@ export const LedgerDashboardView = () => {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Tekući račun (IBAN)
+                    {l.ibanLabel}
                   </label>
                   <input
                     type="text"
@@ -1351,13 +1401,13 @@ export const LedgerDashboardView = () => {
                   onClick={() => setIsAddCompanyOpen(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
                 >
-                  Otkaži
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-md"
                 >
-                  Sačuvaj Firmu
+                  {l.saveClientBtn}
                 </button>
               </div>
             </form>
@@ -1366,7 +1416,7 @@ export const LedgerDashboardView = () => {
       )}
 
       {/* ======================================================== */}
-      {/* 7. MODAL: NOVI / IZMENI RADNIKA                          */}
+      {/* 7. MODAL: ADD / EDIT EMPLOYEE                            */}
       {/* ======================================================== */}
       {isAddEmployeeOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
@@ -1375,9 +1425,7 @@ export const LedgerDashboardView = () => {
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  {editingEmp
-                    ? "Izmeni podatke radnika"
-                    : "Dodaj novog zaposlenog"}
+                  {editingEmp ? l.empModalEditTitle : l.empModalNewTitle}
                 </h3>
               </div>
               <button
@@ -1395,12 +1443,12 @@ export const LedgerDashboardView = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Ime i prezime
+                    {l.fullNameLabel}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="npr. Jovan Simić"
+                    placeholder={l.fullNamePh}
                     value={empForm.ime}
                     onChange={(e) =>
                       setEmpForm({ ...empForm, ime: e.target.value })
@@ -1410,7 +1458,7 @@ export const LedgerDashboardView = () => {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    JMBG (13 cifara)
+                    {l.jmbgLabel}
                   </label>
                   <input
                     type="text"
@@ -1428,11 +1476,11 @@ export const LedgerDashboardView = () => {
 
               <div>
                 <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                  Radno mesto / Pozicija
+                  {l.roleLabel}
                 </label>
                 <input
                   type="text"
-                  placeholder="npr. Glavni elektro-mehaničar"
+                  placeholder={l.rolePh}
                   value={empForm.pozicija}
                   onChange={(e) =>
                     setEmpForm({ ...empForm, pozicija: e.target.value })
@@ -1444,7 +1492,7 @@ export const LedgerDashboardView = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Osnovna ugovorena plata (Bruto RSD)
+                    {l.contractGrossLabel}
                   </label>
                   <input
                     type="number"
@@ -1462,7 +1510,7 @@ export const LedgerDashboardView = () => {
                 </div>
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                    Satnica za proračun (RSD/h)
+                    {l.hourlyRateLabel}
                   </label>
                   <input
                     type="number"
@@ -1482,12 +1530,12 @@ export const LedgerDashboardView = () => {
 
               <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                  Evidencija smena i dodataka za tekući mesec:
+                  {l.shiftHoursHeading}
                 </span>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-0.5">
-                      Prekovremeni (+26%)
+                      {l.otLabel}
                     </label>
                     <input
                       type="number"
@@ -1503,7 +1551,7 @@ export const LedgerDashboardView = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-0.5">
-                      Noćni rad (+26%)
+                      {l.nightLabel}
                     </label>
                     <input
                       type="number"
@@ -1519,7 +1567,7 @@ export const LedgerDashboardView = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] text-slate-600 dark:text-slate-400 mb-0.5">
-                      Državni praznik (+110%)
+                      {l.holLabel}
                     </label>
                     <input
                       type="number"
@@ -1538,7 +1586,7 @@ export const LedgerDashboardView = () => {
 
               <div>
                 <label className="block font-semibold mb-1 text-slate-700 dark:text-slate-300">
-                  Tekući račun za isplatu plate
+                  {l.bankAccLabel}
                 </label>
                 <input
                   type="text"
@@ -1557,13 +1605,13 @@ export const LedgerDashboardView = () => {
                   onClick={() => setIsAddEmployeeOpen(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
                 >
-                  Otkaži
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-md"
                 >
-                  {editingEmp ? "Sa\u010Duvaj Izmene" : "Dodaj Radnika"}
+                  {editingEmp ? l.saveChangesSubmit : l.addEmpSubmit}
                 </button>
               </div>
             </form>
@@ -1572,7 +1620,7 @@ export const LedgerDashboardView = () => {
       )}
 
       {/* ======================================================== */}
-      {/* 8. MODAL: PREGLED ePorezi PPP-PD XML KODA                 */}
+      {/* 8. MODAL: ePorezi PPP-PD XML PREVIEW                     */}
       {/* ======================================================== */}
       {isXmlModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
@@ -1581,7 +1629,7 @@ export const LedgerDashboardView = () => {
               <div className="flex items-center gap-2">
                 <FileCode className="w-5 h-5 text-amber-500" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  ePorezi PPP-PD XML pregled (Poreska uprava RS)
+                  {l.xmlPreviewTitle}
                 </h3>
               </div>
               <button
@@ -1598,21 +1646,20 @@ export const LedgerDashboardView = () => {
 
             <div className="flex justify-between items-center pt-2">
               <span className="text-xs text-slate-500">
-                Ovaj fajl je u potpunosti kompatibilan sa validacionom šemom na
-                portalu ePorezi.
+                {l.xmlSchemaNote}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setIsXmlModalOpen(false)}
                   className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold text-xs"
                 >
-                  Zatvori
+                  {t.common.close}
                 </button>
                 <button
                   onClick={handleDownloadXml}
                   className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md"
                 >
-                  <Download className="w-4 h-4" /> Preuzmi XML
+                  <Download className="w-4 h-4" /> {l.downloadXmlBtn}
                 </button>
               </div>
             </div>
@@ -1621,7 +1668,7 @@ export const LedgerDashboardView = () => {
       )}
 
       {/* ======================================================== */}
-      {/* 9. MODAL: AI SKENER UGOVORA ZA MASOVNI UVOZ              */}
+      {/* 9. MODAL: AI CONTRACT SCANNER                            */}
       {/* ======================================================== */}
       {isAiScanOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
@@ -1630,7 +1677,7 @@ export const LedgerDashboardView = () => {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  AI Skener ugovora o radu / platne liste
+                  {l.aiScannerModalTitle}
                 </h3>
               </div>
               <button
@@ -1648,7 +1695,7 @@ export const LedgerDashboardView = () => {
                 onClick={() => setIsAiScanOpen(false)}
                 className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-xl text-xs"
               >
-                Zatvori skener
+                {l.closeScannerBtn}
               </button>
             </div>
           </div>

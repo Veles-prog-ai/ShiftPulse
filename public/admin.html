@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShiftPulse Ledger Pro — Admin Konzola Servera</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface-2: #1e293b;
+      --border: #273449;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, pre, textarea.mono, input.mono, .mono {
+      font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    header {
+      background: rgba(17, 24, 39, 0.94);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      backdrop-filter: blur(8px);
+    }
+    .wrap {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 60px;
+      flex-wrap: wrap;
+      padding: 10px 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand img { width: 28px; height: 28px; border-radius: 6px; }
+    .brand-title { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+    .brand-sub { font-size: 11px; color: var(--muted); }
+    .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .dot.warn { background: var(--warn); }
+    .dot.bad { background: var(--bad); }
+    main { padding: 20px 0 48px; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; }
+    .kpi-val { font-size: 20px; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    @media (max-width: 1020px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .panel-head {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .panel-title { font-weight: 800; font-size: 14px; }
+    .panel-sub { font-size: 12px; color: var(--muted); }
+    .panel-body { padding: 16px; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    input, select, textarea {
+      width: 100%;
+      background: #090e1a;
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 76px; }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+    button, a.btn-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 13px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover, a.btn-link:hover { background: #293548; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button.primary:hover { background: var(--accent-hover); }
+    button.ok { background: #065f46; border-color: #059669; color: #ecfdf5; }
+    button.ok:hover { background: #047857; }
+    button.warn { background: #78350f; border-color: #d97706; color: #fef3c7; }
+    button.warn:hover { background: #92400e; }
+
+    .notice {
+      margin-top: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      background: #090e1a;
+      display: none;
+    }
+    .notice.show { display: block; }
+    .notice.ok { border-color: #059669; color: #6ee7b7; background: rgba(16, 185, 129, 0.08); }
+    .notice.bad { border-color: #dc2626; color: #fca5a5; background: rgba(239, 68, 68, 0.08); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      background: rgba(15, 23, 42, 0.7);
+      font-weight: 700;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #090e1a;
+      margin-top: 12px;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .tag-ok { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+    .tag-bad { background: rgba(239, 68, 68, 0.16); color: #f87171; }
+    .tag-warn { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+    .tag-muted { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+
+    /* Side-by-Side Diff Viewer */
+    .diff-box {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #070b14;
+      margin-top: 12px;
+    }
+    .diff-table th { width: 50%; }
+    .diff-line-no {
+      display: inline-block;
+      min-width: 24px;
+      color: #64748b;
+      user-select: none;
+      margin-right: 6px;
+      font-size: 11px;
+    }
+    .diff-row-modified td.col-before { background: rgba(239, 68, 68, 0.07); }
+    .diff-row-modified td.col-after { background: rgba(16, 185, 129, 0.07); }
+    .diff-row-removed td.col-before { background: rgba(239, 68, 68, 0.12); }
+    .diff-row-added td.col-after { background: rgba(16, 185, 129, 0.12); }
+    mark.tok-del {
+      background: rgba(239, 68, 68, 0.35);
+      color: #fecaca;
+      text-decoration: line-through;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+    mark.tok-add {
+      background: rgba(16, 185, 129, 0.35);
+      color: #a7f3d0;
+      font-weight: 700;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    .notif-item {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #090e1a;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .notif-item:hover, .notif-item.active { border-color: var(--accent); }
+    .notif-item.unread { border-left: 3px solid var(--warn); }
+    pre.console {
+      background: #070b14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      max-height: 260px;
+      overflow: auto;
+      color: #cbd5e1;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap topbar">
+      <div class="brand">
+        <img src="/icon.svg" alt="ShiftPulse" />
+        <div>
+          <div class="brand-title">ShiftPulse Ledger Pro — Admin Konzola</div>
+          <div class="brand-sub">Direktna komunikacija sa serverom • Zero-Knowledge nadzor (bez pristupa podacima klijenata)</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="badge" id="server-status-badge"><span class="dot" id="server-status-dot"></span> <span id="server-status-text">Povezivanje...</span></span>
+        <a class="btn-link" href="/site">Javni Sajt (/site)</a>
+        <a class="btn-link" href="/install">Instalacioni Portal (/install)</a>
+        <button class="primary" onclick="refreshAll()">Osveži Sve</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- KPI Strip -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Server Runtime & RAM</div>
+        <div class="kpi-val mono" id="kpi-ram">-- MB</div>
+        <div class="kpi-sub mono" id="kpi-uptime">Uptime: --s</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Licenca Stanice</div>
+        <div class="kpi-val" id="kpi-license">--</div>
+        <div class="kpi-sub" id="kpi-license-sub">Provera...</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Gemini Server Proxy</div>
+        <div class="kpi-val" id="kpi-ai">--</div>
+        <div class="kpi-sub">gemini-4-hydrogen (Thinking LOW)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">HITL Telemetrija (Log)</div>
+        <div class="kpi-val mono" id="kpi-hitl">0</div>
+        <div class="kpi-sub">Samo nalog & odluka (0 PII)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Zakonske Izmene (Unread)</div>
+        <div class="kpi-val mono" id="kpi-legal-unread">0</div>
+        <div class="kpi-sub" id="kpi-legal-laws">5 zakona pod nadzorom</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">OS Paketi Spremni</div>
+        <div class="kpi-val mono" id="kpi-pkgs">0 / 3</div>
+        <div class="kpi-sub">Windows / Linux / ChromeOS</div>
+      </div>
+    </div>
+
+    <!-- Top Row: License Generator & Verifier -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">1. Master Generator B2B Licenci (AES-256-CBC)</div>
+            <div class="panel-sub">Prost unos parametara agencije za izdavanje kriptografskog ključa</div>
+          </div>
+          <span class="tag tag-muted mono">POST /api/license/admin-generate</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="lic-agency">Naziv knjigovodstvene agencije / klijenta</label>
+              <input id="lic-agency" type="text" placeholder="npr. Alpha Konto Beograd d.o.o." />
+            </div>
+            <div class="field">
+              <label for="lic-pib">PIB (9 cifara)</label>
+              <input id="lic-pib" class="mono" type="text" placeholder="109876543" maxlength="9" />
+            </div>
+            <div class="field">
+              <label for="lic-workers">Maksimalno radnika</label>
+              <input id="lic-workers" class="mono" type="number" value="500" min="1" />
+            </div>
+            <div class="field full">
+              <label for="lic-exp">Datum isteka licence</label>
+              <input id="lic-exp" class="mono" type="date" />
+            </div>
+            <div class="field full">
+              <label for="lic-output">Generisani kriptografski ključ</label>
+              <textarea id="lic-output" class="mono" readonly placeholder="Kliknite 'Generiši Licencni Ključ' za izradu..."></textarea>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="primary" onclick="generateLicense()">Generiši Licencni Ključ</button>
+            <button onclick="copyGeneratedKey()">Kopiraj Ključ</button>
+            <button onclick="verifyKeyInput(document.getElementById('lic-output').value)">Verifikuj Generisani</button>
+          </div>
+          <div id="lic-gen-notice" class="notice"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">2. Verifikator Ključeva & Istorija Izdatih Licenci</div>
+            <div class="panel-sub">Provera potpisa bez izmene aktivne stanice + revizija izdatih ključeva</div>
+          </div>
+          <span class="tag tag-muted mono">POST /api/license/verify</span>
+        </div>
+        <div class="panel-body">
+          <div class="field">
+            <label for="verify-key-input">Paste license key for signature verification</label>
+            <textarea id="verify-key-input" class="mono" placeholder="Enter AES key (iv:cipher) or RSA-2048 signed token..."></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="primary" onclick="verifyKeyInput(document.getElementById('verify-key-input').value)">Proveri Potpis & Rok</button>
+            <button class="ok" onclick="activateKeyFromAdmin(document.getElementById('verify-key-input').value)">Aktiviraj na Serveru</button>
+          </div>
+          <div id="lic-verify-notice" class="notice"></div>
+
+          <div class="table-wrap" style="max-height: 210px; overflow-y: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vreme</th>
+                  <th>Agencija</th>
+                  <th>PIB</th>
+                  <th>Ističe</th>
+                  <th>Fingerprint</th>
+                </tr>
+              </thead>
+              <tbody id="issued-licenses-body">
+                <tr><td colspan="5" style="color:var(--muted)">Učitavanje istorije...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legal Monitor & Side-by-Side Diff Panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">3. Monitor Zakonskih Izmena & Paralelni Prikaz Odredbi (Minimalni Resursi)</div>
+          <div class="panel-sub">Uslovni HTTP HEAD nadzor (12h interval) + pure-JS LCS paralelno poređenje izmenjenih članova zakona</div>
+        </div>
+        <div class="btn-row" style="margin-top:0">
+          <span class="tag tag-muted mono" id="lm-rss-badge">RAM: -- MB</span>
+          <button class="primary" id="btn-check-laws" onclick="runLegalHttpCheck()">Pokreni HTTP HEAD Proveru Sada</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="table-wrap" style="margin-top:0">
+          <table>
+            <thead>
+              <tr>
+                <th>Kod</th>
+                <th>Zakon / Oblast</th>
+                <th>Nadzirani Članovi</th>
+                <th>Poslednja Provera</th>
+                <th>Status Izvora</th>
+                <th>Akcija</th>
+              </tr>
+            </thead>
+            <tbody id="laws-table-body">
+              <tr><td colspan="6" style="color:var(--muted)">Učitavanje zakona...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="grid-2" style="margin-top:16px; margin-bottom:0">
+          <!-- Compare Form -->
+          <div style="border:1px solid var(--border); border-radius:10px; padding:14px; background:#090e1a;">
+            <div style="font-weight:800; font-size:13px; margin-bottom:10px;">Alat za Uporednu Analizu Nove Odredbe</div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="cmp-law-id">Zakon iz registra</label>
+                <select id="cmp-law-id" onchange="onCompareLawChange()"></select>
+              </div>
+              <div class="field">
+                <label for="cmp-severity">Prioritet notifikacije</label>
+                <select id="cmp-severity">
+                  <option value="high">Visok (Utiče na obračun)</option>
+                  <option value="medium">Srednji (Administrativna)</option>
+                  <option value="low">Informativni</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cmp-article">Oznaka člana / izmene</label>
+                <input id="cmp-article" type="text" placeholder="npr. Član 108 ZOR — Novela Sl. glasnik" />
+              </div>
+              <div class="field">
+                <label for="cmp-note">Izvor / Napomena</label>
+                <input id="cmp-note" type="text" placeholder="npr. Službeni glasnik RS" />
+              </div>
+              <div class="field full">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label for="cmp-text">Novi / predloženi tekst odredbe</label>
+                  <button type="button" style="padding:3px 8px; font-size:11px;" onclick="loadSelectedBaseline()">Učitaj aktivnu bazu</button>
+                </div>
+                <textarea id="cmp-text" class="mono" style="min-height:115px;" placeholder="Unesi ili izmeni tekst zakonske odredbe za paralelno poređenje..."></textarea>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="primary" onclick="compareClause()">Uporedi Paralelno & Pošalji Notifikaciju</button>
+            </div>
+            <div id="cmp-notice" class="notice"></div>
+          </div>
+
+          <!-- Notification Inbox + Diff Picker -->
+          <div style="border:1px solid var(--border); border-radius:10px; padding:14px; background:#090e1a;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-weight:800; font-size:13px;">Admin Notifikacije o Zakonskim Izmenama</div>
+              <span class="tag tag-warn mono" id="notif-unread-pill">0 nepročitanih</span>
+            </div>
+            <div id="notifications-list" style="max-height:290px; overflow-y:auto;">
+              <div style="color:var(--muted); font-size:12px;">Nema zabeleženih notifikacija.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Parallel Diff Viewer -->
+        <div id="diff-viewer-container" style="display:none; margin-top:16px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+            <div>
+              <strong id="diff-title" style="font-size:14px;">Paralelni prikaz izmena</strong>
+              <div id="diff-subtitle" style="font-size:12px; color:var(--muted);"></div>
+            </div>
+            <div class="btn-row" style="margin-top:0" id="diff-actions-row">
+              <button onclick="acknowledgeActiveNotification(false)">Potvrdi Pregled (Zadrži Bazu)</button>
+              <button class="ok" onclick="acknowledgeActiveNotification(true)">Potvrdi & Usvoji kao Novu Bazu</button>
+            </div>
+          </div>
+          <div class="diff-box">
+            <table class="diff-table">
+              <thead>
+                <tr>
+                  <th>Važeća Baza u Softveru (PRE)</th>
+                  <th>Uočena / Predložena Izmena (POSLE)</th>
+                </tr>
+              </thead>
+              <tbody id="diff-rows-body" class="mono"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Row: HITL Telemetry Logs & Server Diagnostics -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">4. Zero-Knowledge HITL Audit Logovi Servera</div>
+            <div class="panel-sub">Isključivo: lokalni nalog, modul, odluka odobrenja i utrošeni AI tokeni (0 klijentskih podataka)</div>
+          </div>
+          <span class="tag tag-ok mono">GET /api/hitl/logs</span>
+        </div>
+        <div class="panel-body">
+          <div class="form-grid">
+            <div class="field">
+              <label for="hitl-search">Pretraga po nalogu / modulu</label>
+              <input id="hitl-search" type="text" placeholder="npr. Glavni Knjigovođa ili AiCopilot..." oninput="renderHitlTable()" />
+            </div>
+            <div class="field">
+              <label for="hitl-filter">Filter odluke</label>
+              <select id="hitl-filter" onchange="renderHitlTable()">
+                <option value="all">Sve odluke</option>
+                <option value="approved">Samo Odobreno (Approved)</option>
+                <option value="rejected">Samo Odbijeno (Rejected)</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="primary" onclick="fetchHitlLogs()">Osveži HITL Logove</button>
+            <button onclick="downloadHitlJson()">Preuzmi Audit JSON</button>
+          </div>
+
+          <div class="table-wrap" style="max-height:290px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vreme</th>
+                  <th>Lokalni Nalog</th>
+                  <th>Modul</th>
+                  <th>Odluka</th>
+                  <th>Tokeni</th>
+                </tr>
+              </thead>
+              <tbody id="hitl-table-body">
+                <tr><td colspan="5" style="color:var(--muted)">Učitavanje HITL logova...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <div class="panel-title">5. OS Paketi & Direktna Server API Dijagnostika</div>
+            <div class="panel-sub">Status instalacionih paketa i direktan JSON upit ka serverskim rutama</div>
+          </div>
+          <span class="tag tag-muted mono">Server Gateway Console</span>
+        </div>
+        <div class="panel-body">
+          <div class="table-wrap" style="margin-top:0; margin-bottom:14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Platforma</th>
+                  <th>Fajl Arhive</th>
+                  <th>Status</th>
+                  <th>Veličina</th>
+                </tr>
+              </thead>
+              <tbody id="packages-table-body">
+                <tr><td colspan="4" style="color:var(--muted)">Provera paketa...</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="field">
+            <label for="diag-endpoint">Direktan Server GET Upit</label>
+            <div style="display:flex; gap:8px;">
+              <input id="diag-endpoint" class="mono" type="text" value="/api/gateway/status" />
+              <button class="primary" style="shrink:0; white-space:nowrap;" onclick="runDiagnosticQuery()">Pošalji Upit</button>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button onclick="quickDiag('/api/health')">/api/health</button>
+            <button onclick="quickDiag('/api/gateway/status')">/api/gateway/status</button>
+            <button onclick="quickDiag('/api/license/status')">/api/license/status</button>
+            <button onclick="quickDiag('/api/admin/overview')">/api/admin/overview</button>
+          </div>
+          <pre class="console mono" id="diag-output">Izaberite ili unesite endpoint za direktan prikaz JSON odgovora servera.</pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let cachedLaws = [];
+    let cachedNotifications = [];
+    let activeNotifId = null;
+    let cachedHitlLogs = [];
+
+    function esc(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function showNotice(id, type, htmlMsg) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = "notice show " + (type === "ok" ? "ok" : "bad");
+      el.innerHTML = htmlMsg;
+    }
+
+    // Default expiry +1 year
+    (function initDefaults() {
+      const d = new Date();
+      d.setFullYear(d.getFullYear() + 1);
+      const iso = d.toISOString().split("T")[0];
+      const expEl = document.getElementById("lic-exp");
+      if (expEl) expEl.value = iso;
+    })();
+
+    async function fetchOverview() {
+      try {
+        const [ovRes, licRes] = await Promise.all([
+          fetch("/api/admin/overview"),
+          fetch("/api/license/status"),
+        ]);
+        const ov = await ovRes.json();
+        const lic = await licRes.json();
+
+        document.getElementById("server-status-dot").className = "dot";
+        document.getElementById("server-status-text").textContent =
+          "Server Online • Port " + (ov.server?.port || 3000);
+
+        document.getElementById("kpi-ram").textContent = (ov.server?.rssMemoryMb ?? "--") + " MB";
+        document.getElementById("kpi-uptime").textContent =
+          "Uptime: " + (ov.server?.uptimeSec ?? 0) + "s • " + (ov.server?.nodeVersion || "");
+
+        const isLicOk = Boolean(lic.valid && lic.success);
+        document.getElementById("kpi-license").textContent = isLicOk ? "ACTIVE" : "TRIAL / UNLICENSED";
+        document.getElementById("kpi-license").style.color = isLicOk ? "#34d399" : "#fbbf24";
+        document.getElementById("kpi-license-sub").textContent =
+          lic.licenciraniPravniSubjekat || "No active key";
+
+        const aiOk = Boolean(ov.server?.geminiProxyConfigured);
+        document.getElementById("kpi-ai").textContent = aiOk ? "SPREMAN" : "NIJE PODEŠEN";
+        document.getElementById("kpi-ai").style.color = aiOk ? "#34d399" : "#f87171";
+
+        document.getElementById("kpi-hitl").textContent = String(ov.hitl?.totalLogs ?? 0);
+        document.getElementById("kpi-legal-unread").textContent = String(
+          ov.legalMonitor?.unreadNotifications ?? 0
+        );
+        document.getElementById("kpi-legal-laws").textContent =
+          (ov.legalMonitor?.watchedLawsCount ?? 5) + " zakona pod nadzorom";
+
+        const issuedBody = document.getElementById("issued-licenses-body");
+        const list = ov.issuedLicenses || [];
+        if (list.length === 0) {
+          issuedBody.innerHTML =
+            '<tr><td colspan="5" style="color:var(--muted)">Još uvek nema izdatih licenci u logu servera.</td></tr>';
+        } else {
+          issuedBody.innerHTML = list
+            .map(
+              (item) => `<tr>
+                <td class="mono">${esc((item.issuedAt || "").slice(0, 16).replace("T", " "))}</td>
+                <td>${esc(item.nazivAgencije)}</td>
+                <td class="mono">${esc(item.pibAgencije)}</td>
+                <td class="mono">${esc(item.datumIsteka)}</td>
+                <td class="mono">${esc(item.keyFingerprint || "-")}</td>
+              </tr>`
+            )
+            .join("");
+        }
+      } catch (e) {
+        document.getElementById("server-status-dot").className = "dot bad";
+        document.getElementById("server-status-text").textContent = "Server Nedostupan";
+      }
+    }
+
+    async function generateLicense() {
+      const nazivAgencije = document.getElementById("lic-agency").value.trim();
+      const pibAgencije = document.getElementById("lic-pib").value.trim();
+      const maksimalnoRadnika = Number(document.getElementById("lic-workers").value) || 500;
+      const datumIsteka = document.getElementById("lic-exp").value;
+
+      if (!nazivAgencije || !pibAgencije || !datumIsteka) {
+        showNotice("lic-gen-notice", "bad", "Unesite naziv agencije, PIB i datum isteka.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/license/admin-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nazivAgencije, pibAgencije, maksimalnoRadnika, datumIsteka }),
+        });
+        const data = await res.json();
+        const key = data.kljucZaKlijenta || data.kljujcZaKlijenta;
+        if (data.success && key) {
+          document.getElementById("lic-output").value = key;
+          document.getElementById("verify-key-input").value = key;
+          showNotice(
+            "lic-gen-notice",
+            "ok",
+            `Ključ uspešno generisan (Fingerprint: <code class="mono">${esc(data.keyFingerprint || "-")}</code>).`
+          );
+          fetchOverview();
+        } else {
+          showNotice("lic-gen-notice", "bad", esc(data.error || "Greška pri generisanju."));
+        }
+      } catch (err) {
+        showNotice("lic-gen-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
+    async function copyGeneratedKey() {
+      const val = document.getElementById("lic-output").value.trim();
+      if (!val) {
+        showNotice("lic-gen-notice", "bad", "Nema generisanog ključa za kopiranje.");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(val);
+        showNotice("lic-gen-notice", "ok", "Licencni ključ kopiran u clipboard.");
+      } catch {
+        showNotice("lic-gen-notice", "bad", "Clipboard nije dostupan — označite i kopirajte tekst ručno.");
+      }
+    }
+
+    async function verifyKeyInput(rawKey) {
+      const kljucLicence = (rawKey || "").trim();
+      if (!kljucLicence) {
+        showNotice("lic-verify-notice", "bad", "Unesite ključ za proveru.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/license/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kljucLicence }),
+        });
+        const data = await res.json();
+        if (data.validna && data.podaci) {
+          showNotice(
+            "lic-verify-notice",
+            "ok",
+            `VALIDNA LICENCA: <strong>${esc(data.podaci.nazivAgencije)}</strong> | PIB: <span class="mono">${esc(data.podaci.pibAgencije)}</span> | Ističe: <span class="mono">${esc(data.podaci.datumIsteka)}</span> | Max radnika: ${esc(data.podaci.maksimalnoRadnika)}`
+          );
+        } else {
+          showNotice("lic-verify-notice", "bad", esc(data.razlog || "Nevalidan ili oštećen ključ."));
+        }
+      } catch {
+        showNotice("lic-verify-notice", "bad", "Greška pri proveri ključa na serveru.");
+      }
+    }
+
+    async function activateKeyFromAdmin(rawKey) {
+      const kljucLicence = (rawKey || "").trim();
+      if (!kljucLicence) {
+        showNotice("lic-verify-notice", "bad", "Unesite ključ za aktivaciju.");
+        return;
+      }
+      try {
+        const res = await fetch("/api/license/activate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kljucLicence }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotice("lic-verify-notice", "ok", esc(data.message || "Licenca aktivirana."));
+          fetchOverview();
+        } else {
+          showNotice("lic-verify-notice", "bad", esc(data.error || "Aktivacija nije uspela."));
+        }
+      } catch {
+        showNotice("lic-verify-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
+    async function fetchLegalMonitor() {
+      try {
+        const res = await fetch("/api/legal-monitor/status");
+        const data = await res.json();
+        cachedLaws = data.laws || [];
+        cachedNotifications = data.notifications || [];
+
+        document.getElementById("lm-rss-badge").textContent =
+          "RAM: " + (data.telemetry?.rssMemoryMb ?? "--") + " MB • Checks: " + (data.telemetry?.checksRun ?? 0);
+        document.getElementById("notif-unread-pill").textContent =
+          (data.telemetry?.unreadCount ?? 0) + " nepročitanih";
+        document.getElementById("kpi-legal-unread").textContent = String(
+          data.telemetry?.unreadCount ?? 0
+        );
+
+        const lawsBody = document.getElementById("laws-table-body");
+        lawsBody.innerHTML = cachedLaws
+          .map((law) => {
+            const checkedStr = law.lastCheckedAt
+              ? esc(law.lastCheckedAt.slice(0, 19).replace("T", " "))
+              : "Nije još pokrenuto";
+            const statusTag =
+              law.lastCheckResult === "header_changed_review_recommended"
+                ? `<span class="tag tag-warn">${esc(law.lastCheckResult)}</span>`
+                : `<span class="tag tag-muted">${esc(law.lastCheckResult || "baseline")}</span>`;
+            return `<tr>
+              <td class="mono"><strong>${esc(law.code)}</strong></td>
+              <td>${esc(law.title)}<div style="font-size:11px; color:var(--muted)">${esc(law.citation)}</div></td>
+              <td>${esc(law.baselineClauseTitle)}</td>
+              <td class="mono">${checkedStr}</td>
+              <td>${statusTag}</td>
+              <td><button onclick="selectLawForCompare('${esc(law.id)}')">Uporedi</button></td>
+            </tr>`;
+          })
+          .join("");
+
+        const cmpSelect = document.getElementById("cmp-law-id");
+        const prevSelected = cmpSelect.value;
+        cmpSelect.innerHTML = cachedLaws
+          .map((l) => `<option value="${esc(l.id)}">${esc(l.code)} — ${esc(l.title)}</option>`)
+          .join("");
+        if (prevSelected && cachedLaws.some((l) => l.id === prevSelected)) {
+          cmpSelect.value = prevSelected;
+        } else if (cachedLaws[0] && !document.getElementById("cmp-text").value) {
+          loadSelectedBaseline();
+        }
+
+        renderNotificationsList();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function selectLawForCompare(lawId) {
+      document.getElementById("cmp-law-id").value = lawId;
+      loadSelectedBaseline();
+    }
+
+    function onCompareLawChange() {
+      loadSelectedBaseline();
+    }
+
+    function loadSelectedBaseline() {
+      const id = document.getElementById("cmp-law-id").value;
+      const law = cachedLaws.find((l) => l.id === id);
+      if (law) {
+        document.getElementById("cmp-text").value = law.baselineText || "";
+        document.getElementById("cmp-article").value = law.baselineClauseTitle || "";
+      }
+    }
+
+    async function runLegalHttpCheck() {
+      const btn = document.getElementById("btn-check-laws");
+      btn.disabled = true;
+      btn.textContent = "Provera u toku...";
+      try {
+        const res = await fetch("/api/legal-monitor/check-now", { method: "POST" });
+        const data = await res.json();
+        await fetchLegalMonitor();
+        showNotice(
+          "cmp-notice",
+          data.success ? "ok" : "bad",
+          data.success
+            ? `HTTP HEAD provera završena za ${data.durationMs}ms (${(data.results || []).length} zakona provereno minimalnim resursima).`
+            : esc(data.error || "Provera nije uspela.")
+        );
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Pokreni HTTP HEAD Proveru Sada";
+      }
+    }
+
+    async function compareClause() {
+      const lawId = document.getElementById("cmp-law-id").value;
+      const updatedText = document.getElementById("cmp-text").value;
+      const articleLabel = document.getElementById("cmp-article").value.trim() || "Izmena zakonske odredbe";
+      const summaryNote = document.getElementById("cmp-note").value.trim();
+      const severity = document.getElementById("cmp-severity").value;
+
+      try {
+        const res = await fetch("/api/legal-monitor/compare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lawId, updatedText, articleLabel, summaryNote, severity }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showNotice("cmp-notice", "bad", esc(data.error || "Greška pri poređenju."));
+          return;
+        }
+        if (!data.hasChanges) {
+          showNotice("cmp-notice", "ok", esc(data.message || "Nema razlika u odnosu na važeću bazu."));
+          return;
+        }
+        showNotice("cmp-notice", "ok", "Detektovana promena — kreirana notifikacija sa paralelnim prikazom.");
+        await fetchLegalMonitor();
+        if (data.notification?.id) {
+          openNotificationDiff(data.notification.id);
+        }
+      } catch {
+        showNotice("cmp-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
+    function renderNotificationsList() {
+      const box = document.getElementById("notifications-list");
+      if (cachedNotifications.length === 0) {
+        box.innerHTML = '<div style="color:var(--muted); font-size:12px;">Nema zabeleženih zakonskih notifikacija.</div>';
+        return;
+      }
+      box.innerHTML = cachedNotifications
+        .map((n) => {
+          const isActive = n.id === activeNotifId;
+          const cls = `notif-item ${n.acknowledged ? "" : "unread"} ${isActive ? "active" : ""}`;
+          const badge = n.acknowledged
+            ? '<span class="tag tag-ok">Pregledano</span>'
+            : '<span class="tag tag-warn">Novo • Čeka Admina</span>';
+          return `<div class="${cls}" onclick="openNotificationDiff('${esc(n.id)}')">
+            <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
+              <strong style="font-size:12px;">[${esc(n.lawCode)}] ${esc(n.articleLabel)}</strong>
+              ${badge}
+            </div>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">${esc(n.summary)}</div>
+            <div class="mono" style="font-size:10px; color:#64748b; margin-top:4px;">${esc((n.detectedAt || "").slice(0, 19).replace("T", " "))}</div>
+          </div>`;
+        })
+        .join("");
+    }
+
+    function renderTokenList(tokens, tokenKind) {
+      if (!Array.isArray(tokens) || tokens.length === 0) return '<span style="color:#475569">—</span>';
+      return tokens
+        .map((t) => {
+          if (!t.changed) return esc(t.text);
+          const cls = tokenKind === "before" ? "tok-del" : "tok-add";
+          return `<mark class="${cls}">${esc(t.text)}</mark>`;
+        })
+        .join("");
+    }
+
+    function openNotificationDiff(notifId) {
+      const n = cachedNotifications.find((item) => item.id === notifId);
+      if (!n) return;
+      activeNotifId = notifId;
+      renderNotificationsList();
+
+      document.getElementById("diff-viewer-container").style.display = "block";
+      document.getElementById("diff-title").textContent =
+        `[${n.lawCode}] ${n.lawTitle} — ${n.articleLabel}`;
+      document.getElementById("diff-subtitle").textContent = n.summary || "";
+      document.getElementById("diff-actions-row").style.display = n.acknowledged ? "none" : "flex";
+
+      const rows = n.sideBySideDiff?.rows || [];
+      document.getElementById("diff-rows-body").innerHTML = rows
+        .map((r) => {
+          const rowCls =
+            r.type === "modified"
+              ? "diff-row-modified"
+              : r.type === "removed"
+              ? "diff-row-removed"
+              : r.type === "added"
+              ? "diff-row-added"
+              : "";
+          const beforeNo = r.lineNumberBefore != null ? `<span class="diff-line-no">${r.lineNumberBefore}</span>` : "";
+          const afterNo = r.lineNumberAfter != null ? `<span class="diff-line-no">${r.lineNumberAfter}</span>` : "";
+          return `<tr class="${rowCls}">
+            <td class="col-before">${beforeNo}${renderTokenList(r.beforeTokens, "before")}</td>
+            <td class="col-after">${afterNo}${renderTokenList(r.afterTokens, "after")}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    async function acknowledgeActiveNotification(adoptAsBaseline) {
+      if (!activeNotifId) return;
+      try {
+        const res = await fetch(
+          `/api/legal-monitor/notifications/${encodeURIComponent(activeNotifId)}/acknowledge`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adoptAsBaseline: Boolean(adoptAsBaseline) }),
+          }
+        );
+        const data = await res.json();
+        if (data.success) {
+          await fetchLegalMonitor();
+          openNotificationDiff(activeNotifId);
+          fetchOverview();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function fetchHitlLogs() {
+      try {
+        const res = await fetch("/api/hitl/logs");
+        const data = await res.json();
+        cachedHitlLogs = data.logs || [];
+        document.getElementById("kpi-hitl").textContent = String(data.totalCount ?? cachedHitlLogs.length);
+        renderHitlTable();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function renderHitlTable() {
+      const q = (document.getElementById("hitl-search").value || "").trim().toLowerCase();
+      const filter = document.getElementById("hitl-filter").value;
+      const rows = cachedHitlLogs.filter((entry) => {
+        const decision = String(entry.decision || entry.approvalDecision || "approved").toLowerCase();
+        if (filter === "approved" && decision !== "approved" && decision !== "edited_approved") return false;
+        if (filter === "rejected" && decision !== "rejected") return false;
+        if (q) {
+          const hay = `${entry.accountUsername || ""} ${entry.accountName || ""} ${entry.accountId || ""} ${entry.accountRole || ""} ${entry.module || ""} ${entry.executionSource || ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      const tbody = document.getElementById("hitl-table-body");
+      if (rows.length === 0) {
+        tbody.innerHTML =
+          '<tr><td colspan="5" style="color:var(--muted)">Nema HITL zapisa za izabrani filter.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows
+        .map((e) => {
+          const ts = esc((e.timestamp || "").slice(0, 19).replace("T", " "));
+          const acc = esc(e.accountUsername || e.accountName || e.accountId || "Operater");
+          const role = esc(e.accountRole || "");
+          const mod = esc(e.module || e.actionType || "ai_copilot");
+          const dec = String(e.decision || e.approvalDecision || "approved").toLowerCase();
+          const decBadge =
+            dec === "rejected"
+              ? '<span class="tag tag-bad">ODBIJENO</span>'
+              : dec === "edited_approved"
+              ? '<span class="tag tag-warn">IZMENJENO + ODOBRENO</span>'
+              : '<span class="tag tag-ok">ODOBRENO</span>';
+          const tokens = Number(e.totalTokens ?? e.tokensUsed ?? 0);
+          const isCachedOrLocal =
+            e.cached ||
+            e.executionSource === "local_sha256_cache" ||
+            e.executionSource === "local_deterministic_filter";
+          return `<tr>
+            <td class="mono">${ts}</td>
+            <td><strong>${acc}</strong><div style="font-size:11px; color:var(--muted)">${role}</div></td>
+            <td class="mono">${mod}<div style="font-size:10px; color:var(--muted)">${esc(e.executionSource || "")}</div></td>
+            <td>${decBadge}</td>
+            <td class="mono">${isCachedOrLocal ? tokens + " (Lokalno/Keš)" : tokens}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    function downloadHitlJson() {
+      const blob = new Blob([JSON.stringify(cachedHitlLogs, null, 2)], {
+        type: "application/json;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ShiftPulse_HITL_Audit_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function fetchPackagesInfo() {
+      try {
+        const res = await fetch("/api/packages/info");
+        const data = await res.json();
+        const pkgs = Object.values(data.packages || {});
+        const readyCount = pkgs.filter((p) => p.exists).length;
+        document.getElementById("kpi-pkgs").textContent = `${readyCount} / ${pkgs.length}`;
+
+        document.getElementById("packages-table-body").innerHTML = pkgs
+          .map(
+            (p) => `<tr>
+              <td><strong>${esc(p.title)}</strong></td>
+              <td class="mono">${esc(p.filename)}</td>
+              <td>${p.exists ? '<span class="tag tag-ok">Spreman</span>' : '<span class="tag tag-warn">Nije buildovan</span>'}</td>
+              <td class="mono">${esc(p.sizeFormatted || "-")}</td>
+            </tr>`
+          )
+          .join("");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function quickDiag(path) {
+      document.getElementById("diag-endpoint").value = path;
+      runDiagnosticQuery();
+    }
+
+    async function runDiagnosticQuery() {
+      const path = document.getElementById("diag-endpoint").value.trim() || "/api/health";
+      const out = document.getElementById("diag-output");
+      const t0 = performance.now();
+      try {
+        const res = await fetch(path);
+        const text = await res.text();
+        const ms = Math.round(performance.now() - t0);
+        let formatted = text;
+        try {
+          formatted = JSON.stringify(JSON.parse(text), null, 2);
+        } catch {}
+        out.textContent = `HTTP ${res.status} (${ms}ms) • GET ${path}\n\n${formatted}`;
+      } catch (err) {
+        out.textContent = `GREŠKA: ${err.message}`;
+      }
+    }
+
+    function refreshAll() {
+      fetchOverview();
+      fetchLegalMonitor();
+      fetchHitlLogs();
+      fetchPackagesInfo();
+    }
+
+    refreshAll();
+  </script>
+</body>
+</html>

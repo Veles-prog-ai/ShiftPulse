@@ -229,7 +229,7 @@ export const JobModal = ({ job, onClose }) => {
                 >
                   <option value="$">$ (USD)</option>
                   <option value="€">€ (EUR)</option>
-                  <option value="RSD">RSD (Динар)</option>
+                  <option value="RSD">{t.ui.jobModal.currencyRsd}</option>
                   <option value="CHF">CHF</option>
                   <option value="£">£ (GBP)</option>
                   <option value="A$">A$ (AUD)</option>

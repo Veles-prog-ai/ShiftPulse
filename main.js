@@ -11,7 +11,7 @@ function startBackendServer() {
     // Pokrećemo server.js ili server.ts kao lokalni background proces
     const serverScript = path.join(__dirname, 'server.js');
     serverProcess = spawn('node', [serverScript], {
-      env: { ...process.env, PORT: '3000', NODE_ENV: 'production' },
+      env: { ...process.env, PORT: '3000', NODE_ENV: 'production', SHIFTPULSE_LOCAL_DESKTOP: '1' },
       stdio: 'inherit'
     });
 

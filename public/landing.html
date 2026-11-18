@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShiftPulse Ledger Pro — Zero-Knowledge Accounting &amp; Payroll System</title>
+  <meta name="description" content="Hybrid Zero-Knowledge accounting, tax, P&amp;L, and payroll software for Windows, Linux, and ChromeOS. Launch v1.0 available exclusively for the Republic of Serbia (RS)." />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #4338ca;
+      --accent-hover: #3730a3;
+      --amber-bg: #fffbeb;
+      --amber-border: #f59e0b;
+      --amber-text: #78350f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    header {
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand img { width: 34px; height: 34px; border-radius: 9px; }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 22px;
+      background: var(--accent);
+      color: #ffffff;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 11px 22px;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover { background: #f1f5f9; }
+    .hero {
+      padding: 68px 0 56px;
+      border-bottom: 1px solid var(--border);
+    }
+    .kicker {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: clamp(32px, 4.5vw, 52px);
+      font-weight: 800;
+      line-height: 1.08;
+      letter-spacing: -0.025em;
+      max-width: 820px;
+      margin-bottom: 20px;
+    }
+    .lead {
+      font-size: 18px;
+      color: var(--muted);
+      max-width: 700px;
+      margin-bottom: 24px;
+    }
+    .market-notice {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      border-left: 4px solid var(--amber-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 28px;
+      max-width: 780px;
+      color: var(--amber-text);
+      font-size: 14px;
+    }
+    .market-notice strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 3px;
+      color: #451a03;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+    .section-title {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .section-sub { color: var(--muted); font-size: 15px; margin-bottom: 32px; max-width: 680px; }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .card p { font-size: 14px; color: var(--muted); }
+    .mono-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .spec-list {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .spec-list li::before {
+      content: "— ";
+      color: var(--accent);
+      font-weight: 700;
+    }
+    footer {
+      padding: 32px 0;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a href="/site" class="brand">
+        <img src="/icon.svg" alt="ShiftPulse" />
+        <span>ShiftPulse Ledger Pro</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#architecture">Architecture</a>
+        <a href="#downloads">Desktop Packages</a>
+        <a href="/install">PWA / Mobile Portal</a>
+      </nav>
+      <a href="/" class="btn-primary">Open Client Workspace</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="kicker">Hybrid Zero-Knowledge Accounting &amp; Payroll Gateway</div>
+        <h1>Your client books never leave your device. The server acts strictly as a gateway.</h1>
+        <p class="lead">
+          Deterministic 0-token analysis of invoices, delivery notes, POS slips, VAT, corporate tax, and shift payroll — paired with encrypted personal cloud backup and Human-in-the-Loop AI governance.
+        </p>
+
+        <div class="market-notice">
+          <strong>Launch Availability Notice (v1.0): Republic of Serbia (RS) Only</strong>
+          ShiftPulse Ledger Pro Launch v1.0 is currently available exclusively for businesses and accounting agencies operating in the Republic of Serbia (Labor Law Art. 108, PURS PPP-PD XML, SEF eFaktura UBL, NBS IPS). Regional Balkan &amp; EU country packs (HR, BA, ME, SI, EU) are scheduled for post-launch expansion phases.
+        </div>
+
+        <div class="hero-actions">
+          <a href="#downloads" class="btn-primary">Download Desktop Installer</a>
+          <a href="/install" class="btn-secondary">PWA &amp; QR Install Portal</a>
+          <a href="/" class="btn-secondary">Launch Workspace</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="section">
+      <div class="wrap">
+        <h2 class="section-title">Three-tier privacy-first architecture</h2>
+        <p class="section-sub">
+          The accounting workspace is strictly isolated from public marketing pages and licensing administration, keeping client records under your physical custody.
+        </p>
+        <div class="grid-3">
+          <div class="card">
+            <div>
+              <h3>01. Local Workstation Folders</h3>
+              <p>Installation automatically provisions <code class="mono-meta">ShiftPulse_Workspace</code> (<code class="mono-meta">01_Ulaz_Dokumenta</code> and <code class="mono-meta">02_Izlaz_Dokumenta</code>) for offline operation and self-managed AES-256-GCM cloud backups.</p>
+            </div>
+            <div class="mono-meta">Zero-Knowledge · Zero payroll or tax data stored on cloud servers</div>
+          </div>
+
+          <div class="card">
+            <div>
+              <h3>02. Zero-Token Analytical Automaton</h3>
+              <p>SEF UBL XML invoices, bank CSV statements, delivery notes, and POS receipts are parsed locally with deterministic VAT reconciliation and Serbian chart of accounts (Class 5 &amp; 6) classification.</p>
+            </div>
+            <div class="mono-meta">0 AI Tokens · Deterministic PIB Mod-11 &amp; Balance Validation</div>
+          </div>
+
+          <div class="card">
+            <div>
+              <h3>03. HITL Operators &amp; Regulatory Watch</h3>
+              <p>Local operator accounts enforce Human-in-the-Loop approval before accepting AI suggestions. Only the operator approval decision and token count are audited, while the gateway monitors statutory law changes.</p>
+            </div>
+            <div class="mono-meta">Minimal Token Consumption · Local Pre-Filter &amp; SHA-256 Cache</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="downloads" class="section">
+      <div class="wrap">
+        <h2 class="section-title">Download Commercial Workstation Packages (v1.0 — Serbia RS)</h2>
+        <p class="section-sub">
+          Select your operating system. Every installer builds your local folder tree automatically and works offline once installed.
+        </p>
+
+        <div class="grid-3">
+          <div class="card">
+            <div>
+              <h3>Windows (Primary Platform)</h3>
+              <p>Windows 10, Windows 11, and Windows Server. Includes automated setup script, Desktop shortcut, and local desktop gateway runtime.</p>
+            </div>
+            <ul class="spec-list">
+              <li>Provisions <code class="mono-meta">Documents\ShiftPulse_Workspace</code></li>
+              <li>Offline P&amp;L scanner, NBS IPS orders &amp; PPP-PD XML</li>
+            </ul>
+            <a href="/api/packages/download/windows" class="btn-primary">Download for Windows (.zip)</a>
+          </div>
+
+          <div class="card">
+            <div>
+              <h3>Linux Desktop</h3>
+              <p>Ubuntu, Debian, Fedora, and Arch Linux. Includes <code class="mono-meta">install-linux.sh</code> and FreeDesktop application menu integration.</p>
+            </div>
+            <ul class="spec-list">
+              <li>Provisions <code class="mono-meta">~/ShiftPulse_Workspace</code></li>
+              <li>Full offline &amp; gateway workstation execution</li>
+            </ul>
+            <a href="/api/packages/download/linux" class="btn-secondary">Download for Linux (.tar.gz)</a>
+          </div>
+
+          <div class="card">
+            <div>
+              <h3>ChromeOS &amp; Chromebook</h3>
+              <p>Crostini Linux container bundle or direct 1-click PWA Shelf installation via the dedicated install portal.</p>
+            </div>
+            <ul class="spec-list">
+              <li>Supports ChromeOS &amp; ChromeOS Flex</li>
+              <li>Service Worker offline cache with local persistence</li>
+            </ul>
+            <a href="/api/packages/download/chromeos" class="btn-secondary">Download for ChromeOS (.zip)</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <div>ShiftPulse Ledger Pro v1.0 (Republic of Serbia Edition) · Zero-Knowledge Hybrid Gateway</div>
+    <div style="display: flex; gap: 20px;">
+      <a href="/install" style="color: var(--accent); text-decoration: none; font-weight: 600;">Install Portal</a>
+      <a href="/" style="color: var(--accent); text-decoration: none; font-weight: 600;">Client Workspace</a>
+    </div>
+  </footer>
+</body>
+</html>

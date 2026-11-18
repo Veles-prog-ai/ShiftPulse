@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Device Installation Portal — ShiftPulse Ledger Pro</title>
+  <meta name="description" content="Install ShiftPulse Ledger Pro directly on Windows, Linux, ChromeOS, Android, or iOS with offline support. Launch v1.0 available exclusively for Serbia (RS)." />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="ShiftPulse" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container {
+      width: 100%;
+      max-width: 680px;
+      margin: 0 auto;
+      padding-bottom: 40px;
+    }
+    .iframe-alert {
+      display: none;
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid var(--accent-amber);
+      border-radius: 16px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #fef3c7;
+      text-align: center;
+      animation: fadeIn 0.3s ease;
+    }
+    .iframe-alert strong {
+      color: #fbbf24;
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+    .btn-breakout {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--accent-amber);
+      color: #0f172a;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      text-decoration: none;
+      margin-top: 8px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-breakout:hover { background: #f59e0b; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 28px 24px;
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.6);
+      margin-bottom: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .logo-container {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 14px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid rgba(255, 255, 255, 0.12);
+    }
+    .logo-container img { width: 100%; height: 100%; display: block; }
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+    .badge-sub {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #818cf8;
+      background: rgba(99, 102, 241, 0.12);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      max-width: 460px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+    .region-notice {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #fde68a;
+      line-height: 1.5;
+    }
+    .region-notice strong { color: #fbbf24; }
+    .install-action-box {
+      background: rgba(79, 70, 229, 0.08);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      border-radius: 18px;
+      padding: 20px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .btn-install-primary {
+      width: 100%;
+      background: #4f46e5;
+      color: #ffffff;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 15px 24px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background 0.2s ease;
+    }
+    .btn-install-primary:hover { background: #4338ca; }
+    .installed-badge {
+      display: none;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid var(--accent-green);
+      color: #34d399;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 14px 20px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .qr-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .qr-wrapper {
+      background: white;
+      padding: 12px;
+      border-radius: 16px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+    .qr-wrapper img { display: block; width: 170px; height: 170px; }
+    .qr-instructions {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      max-width: 380px;
+    }
+    .share-link-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      width: 100%;
+      max-width: 440px;
+    }
+    .share-input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+    .btn-copy {
+      background: #334155;
+      color: #f8fafc;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-copy:hover { background: #475569; }
+    .platform-accordion {
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .platform-tab-header {
+      padding: 14px 18px;
+      background: #1e293b;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--card-border);
+      color: #e2e8f0;
+    }
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      padding: 16px;
+      background: #0f172a;
+    }
+    .platform-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .platform-title {
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #ffffff;
+    }
+    .platform-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 12px;
+    }
+    .btn-download-sm {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #3b82f6;
+      color: white;
+      text-decoration: none;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .btn-download-sm:hover { background: #2563eb; }
+    .footer-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 16px;
+      border-top: 1px solid var(--card-border);
+    }
+    .btn-ghost {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .btn-ghost:hover { color: #ffffff; }
+    .btn-launch-web {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1f2937;
+      color: #f3f4f6;
+      border: 1px solid #374151;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .btn-launch-web:hover { background: #374151; color: #ffffff; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Iframe Breakout Alert -->
+    <div id="iframeAlert" class="iframe-alert">
+      <strong>Embedded Frame Detected</strong>
+      Browsers block 1-click PWA installation inside embedded iframes. Open the install portal in a full browser window:
+      <br>
+      <a id="breakoutLink" href="/install" target="_blank" rel="noopener noreferrer" class="btn-breakout">
+        Open in Full Browser Window
+      </a>
+    </div>
+
+    <!-- Main Card -->
+    <div class="card">
+      <div class="header">
+        <div class="logo-container">
+          <img src="/icon.svg" alt="ShiftPulse Logo" />
+        </div>
+        <span class="badge-sub">Official Commercial Installer</span>
+        <h1>Install ShiftPulse Ledger Pro</h1>
+        <p class="subtitle">
+          Run directly on your desktop, mobile home screen, or ChromeOS Shelf with local folder provisioning and offline support.
+        </p>
+      </div>
+
+      <div class="region-notice">
+        <strong>Launch v1.0 Availability — Republic of Serbia (RS) Only:</strong> This release is configured exclusively for Serbian statutory payroll, PURS PPP-PD XML, SEF eFaktura, and NBS IPS orders. Additional countries will roll out in subsequent releases.
+      </div>
+
+      <div class="install-action-box">
+        <button id="pwaInstallBtn" class="btn-install-primary">
+          <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          <span id="installBtnText">Install App on This Device</span>
+        </button>
+
+        <div id="installedBadge" class="installed-badge">
+          ShiftPulse Ledger Pro is installed as a standalone app on this device.
+        </div>
+
+        <p id="promptStatus" style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+          Supported platforms: Windows 10/11, Linux, ChromeOS, Android, iOS Safari, and macOS.
+        </p>
+      </div>
+
+      <!-- QR Code for Mobile -->
+      <div class="qr-section">
+        <div class="qr-wrapper">
+          <img id="qrImg" src="" alt="Installation QR Code" />
+        </div>
+        <div class="qr-instructions">
+          <strong>Mobile or Tablet Installation:</strong><br />
+          Scan the QR code above with your camera to open and install ShiftPulse on your device.
+        </div>
+
+        <div class="share-link-row">
+          <input type="text" id="shareUrlInput" class="share-input" readonly />
+          <button id="copyBtn" class="btn-copy">Copy</button>
+        </div>
+      </div>
+
+      <!-- Standalone OS Packages Downloads -->
+      <div class="platform-accordion">
+        <div class="platform-tab-header">
+          <span>Desktop Workstation Installers</span>
+          <span style="font-size: 11px; color: #818cf8; font-weight: 700;">Commercial v1.0 (RS)</span>
+        </div>
+
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div>
+              <div class="platform-title">Windows (10 / 11 / Server)</div>
+              <div class="platform-desc">
+                Includes <code>install-windows.bat</code>, Desktop shortcut creation, and <code>ShiftPulse_Workspace</code> provisioning.
+              </div>
+            </div>
+            <a href="/api/packages/download/windows" class="btn-download-sm">
+              Download Windows Package (.zip)
+            </a>
+          </div>
+
+          <div class="platform-card">
+            <div>
+              <div class="platform-title">Linux (Ubuntu / Debian / Arch)</div>
+              <div class="platform-desc">
+                Includes <code>install-linux.sh</code> and XDG <code>shiftpulse-ledger.desktop</code> menu launcher.
+              </div>
+            </div>
+            <a href="/api/packages/download/linux" class="btn-download-sm">
+              Download Linux Package (.tar.gz)
+            </a>
+          </div>
+
+          <div class="platform-card">
+            <div>
+              <div class="platform-title">ChromeOS &amp; Chromebook</div>
+              <div class="platform-desc">
+                Native PWA Shelf integration or Crostini Linux container bundle for offline desktop usage.
+              </div>
+            </div>
+            <a href="/api/packages/download/chromeos" class="btn-download-sm">
+              Download ChromeOS Package (.zip)
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- iOS Guide -->
+      <div id="iosGuideBox" style="display: none; background: #1e1b4b; border: 1px solid #4338ca; border-radius: 16px; padding: 16px; margin-bottom: 20px; font-size: 12px; color: #e0e7ff;">
+        <strong style="color: #ffffff; font-size: 13px; display: block; margin-bottom: 6px;">
+          iPhone / iPad Instructions (iOS Safari):
+        </strong>
+        1. Tap the <strong>Share</strong> icon in Safari.<br />
+        2. Select <strong>"Add to Home Screen"</strong>.<br />
+        3. Launch ShiftPulse directly from your home screen.
+      </div>
+
+      <div class="footer-actions">
+        <a href="/site" class="btn-ghost">Back to Website</a>
+        <a href="/" class="btn-launch-web">
+          <span>Open Client Workspace</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const inIframe = window.self !== window.top;
+    const iframeAlert = document.getElementById('iframeAlert');
+    const breakoutLink = document.getElementById('breakoutLink');
+    const CANONICAL_PUBLIC_URL = 'https://ais-pre-2tybexmipzl3i3cfjpi7pp-948274075241.europe-west2.run.app';
+    const effectiveUrl = inIframe ? CANONICAL_PUBLIC_URL : window.location.origin;
+
+    if (inIframe) {
+      iframeAlert.style.display = 'block';
+      breakoutLink.href = CANONICAL_PUBLIC_URL + '/install';
+    }
+
+    const shareInput = document.getElementById('shareUrlInput');
+    shareInput.value = effectiveUrl;
+
+    const qrImg = document.getElementById('qrImg');
+    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(effectiveUrl);
+
+    function showNotification(message, type = 'info') {
+      let toast = document.getElementById('customToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'customToast';
+        toast.style.position = 'fixed';
+        toast.style.bottom = '24px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.padding = '12px 20px';
+        toast.style.borderRadius = '12px';
+        toast.style.fontSize = '13px';
+        toast.style.fontWeight = '700';
+        toast.style.color = '#ffffff';
+        toast.style.zIndex = '9999';
+        toast.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.5)';
+        toast.style.transition = 'all 0.3s ease';
+        toast.style.maxWidth = '90%';
+        toast.style.textAlign = 'center';
+        document.body.appendChild(toast);
+      }
+      toast.style.background = type === 'success' ? '#059669' : type === 'warning' ? '#d97706' : '#4f46e5';
+      toast.innerText = message;
+      toast.style.opacity = '1';
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 300);
+      }, 3500);
+    }
+
+    const copyBtn = document.getElementById('copyBtn');
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(shareInput.value).then(() => {
+        copyBtn.innerText = 'Copied!';
+        copyBtn.style.background = '#10b981';
+        showNotification('Install URL copied to clipboard.', 'success');
+        setTimeout(() => {
+          copyBtn.innerText = 'Copy';
+          copyBtn.style.background = '#334155';
+        }, 2000);
+      });
+    });
+
+    const isIOS = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    if (isIOS) {
+      document.getElementById('iosGuideBox').style.display = 'block';
+    }
+
+    let deferredPrompt = null;
+    const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+    const installedBadge = document.getElementById('installedBadge');
+    const promptStatus = document.getElementById('promptStatus');
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isStandalone) {
+      pwaInstallBtn.style.display = 'none';
+      installedBadge.style.display = 'block';
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      promptStatus.innerText = 'Browser is ready for 1-click PWA installation.';
+      promptStatus.style.color = '#34d399';
+    });
+
+    pwaInstallBtn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          pwaInstallBtn.style.display = 'none';
+          installedBadge.style.display = 'block';
+          deferredPrompt = null;
+          showNotification('ShiftPulse Ledger Pro installed successfully.', 'success');
+        }
+      } else {
+        if (inIframe) {
+          showNotification('Open this portal in a full browser tab using the yellow button above to install.', 'warning');
+        } else if (isIOS) {
+          document.getElementById('iosGuideBox').scrollIntoView({ behavior: 'smooth' });
+          showNotification('Use Safari Share menu -> Add to Home Screen.', 'info');
+        } else {
+          showNotification('Use the Install icon in your browser address bar or browser menu -> Install App.', 'info');
+        }
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      pwaInstallBtn.style.display = 'none';
+      installedBadge.style.display = 'block';
+      showNotification('ShiftPulse Ledger Pro installed successfully.', 'success');
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>

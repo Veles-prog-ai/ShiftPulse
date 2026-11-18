@@ -42,13 +42,12 @@ export const LanguageImportModal = ({ onClose }) => {
         if (parsed.flag) setLangFlag(parsed.flag);
         setFeedback({
           type: "success",
-          message:
-            "JSON file read successfully. Review metadata and click Import.",
+          message: t.ui.langImport.importOk,
         });
       } catch (err) {
         setFeedback({
           type: "error",
-          message: "Could not parse JSON file. Please ensure it is valid JSON.",
+          message: t.customLang.importError,
         });
       }
     };
@@ -59,7 +58,7 @@ export const LanguageImportModal = ({ onClose }) => {
       if (!jsonText.trim()) {
         setFeedback({
           type: "error",
-          message: "Please select a JSON file or paste translation JSON text.",
+          message: t.customLang.importError,
         });
         return;
       }
@@ -73,17 +72,10 @@ export const LanguageImportModal = ({ onClose }) => {
       ).trim();
       const flag = (langFlag || parsed.flag || "\u{1F310}").trim();
       const translations = parsed.translations || parsed;
-      if (!code) {
+      if (!code || !name) {
         setFeedback({
           type: "error",
-          message: 'Language code is required (e.g. "fr", "it", "es").',
-        });
-        return;
-      }
-      if (!name) {
-        setFeedback({
-          type: "error",
-          message: 'Language name is required (e.g. "Fran\xE7ais").',
+          message: t.customLang.importError,
         });
         return;
       }
@@ -112,7 +104,7 @@ export const LanguageImportModal = ({ onClose }) => {
     } catch (err) {
       setFeedback({
         type: "error",
-        message: `${t.customLang.importError} (${err.message || "JSON parse error"})`,
+        message: `${t.customLang.importError} (${err.message || t.ui.common.error})`,
       });
     }
   };
@@ -153,8 +145,7 @@ export const LanguageImportModal = ({ onClose }) => {
                   {t.customLang.downloadTemplate}
                 </h4>
                 <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
-                  Get the full boilerplate with all ~100 UI strings in English
-                  ready to translate.
+                  {t.ui.langImport.subtitle}
                 </p>
               </div>
             </div>
@@ -163,7 +154,7 @@ export const LanguageImportModal = ({ onClose }) => {
               className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all whitespace-nowrap active:scale-[0.98]"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Download JSON</span>
+              <span>{t.ui.langImport.downloadTemplateBtn}</span>
             </button>
           </div>
 
@@ -192,7 +183,7 @@ export const LanguageImportModal = ({ onClose }) => {
                   {t.customLang.selectJson}
                 </span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Click to select JSON translation file from your computer
+                  {t.ui.langImport.importJsonBtn}
                 </p>
               </div>
             </button>
@@ -207,7 +198,7 @@ export const LanguageImportModal = ({ onClose }) => {
                   type="text"
                   value={langCode}
                   onChange={(e) => setLangCode(e.target.value)}
-                  placeholder="e.g. fr, es, it"
+                  placeholder="fr, es, it"
                   className="w-full px-3 py-1.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -220,7 +211,7 @@ export const LanguageImportModal = ({ onClose }) => {
                   type="text"
                   value={langName}
                   onChange={(e) => setLangName(e.target.value)}
-                  placeholder="e.g. Français"
+                  placeholder="Français"
                   className="w-full px-3 py-1.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -233,7 +224,7 @@ export const LanguageImportModal = ({ onClose }) => {
                   type="text"
                   value={langFlag}
                   onChange={(e) => setLangFlag(e.target.value)}
-                  placeholder="e.g. 🇫🇷"
+                  placeholder="🇫🇷"
                   className="w-full px-3 py-1.5 rounded-xl text-xs border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
                 />
               </div>
@@ -243,7 +234,7 @@ export const LanguageImportModal = ({ onClose }) => {
             {jsonText && (
               <div className="pt-1">
                 <div className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  JSON Data Preview ({jsonText.length} bytes loaded)
+                  JSON ({jsonText.length} B)
                 </div>
                 <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-[11px] font-mono text-slate-700 dark:text-slate-300 max-h-24 overflow-y-auto border border-slate-200 dark:border-slate-700">
                   {jsonText.slice(0, 300)}...
@@ -276,12 +267,12 @@ export const LanguageImportModal = ({ onClose }) => {
           {/* Installed Custom Languages List */}
           <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-              {t.customLang.customLanguages} ({customLanguages.length})
+              {t.ui.langImport.customPacksTitle} ({customLanguages.length})
             </h4>
 
             {customLanguages.length === 0 ? (
               <p className="text-xs text-slate-500 dark:text-slate-400 italic">
-                {t.customLang.noCustomLanguages}
+                {t.ui.langImport.noCustomPacks}
               </p>
             ) : (
               <div className="space-y-1.5">
@@ -297,7 +288,7 @@ export const LanguageImportModal = ({ onClose }) => {
                       </span>
                       {language === c.code && (
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
-                          Active
+                          {t.ui.common.active}
                         </span>
                       )}
                     </div>
@@ -306,12 +297,12 @@ export const LanguageImportModal = ({ onClose }) => {
                         onClick={() => setLanguage(c.code)}
                         className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors"
                       >
-                        Activate
+                        {t.ui.common.active}
                       </button>
                       <button
                         onClick={() => deleteCustomLanguage(c.code)}
                         className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                        title={t.customLang.deleteCustom}
+                        title={t.ui.langImport.deletePackBtn}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

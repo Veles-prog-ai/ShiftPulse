@@ -22,6 +22,7 @@ export const RosterPatternModal = ({ onClose }) => {
     openSubscriptionModal,
   } = useShift();
   const { t, formatDate, getWeekdayName } = useLanguage();
+  const r = t.ui.rosterModalExtra;
   const [model, setModel] = useState("day_night_2rest");
   const [jobId, setJobId] = useState(() => jobs[0]?.id || "");
   const [startDate, setStartDate] = useState(() => {
@@ -44,8 +45,8 @@ export const RosterPatternModal = ({ onClose }) => {
         {
           index: 0,
           type: "day",
-          label: "8h Standardno (08:00 - 16:00)",
-          desc: "Pon-Pet",
+          label: r.phase8hStdLabel,
+          desc: r.phase8hStdDesc,
           icon: Sun,
         },
       ];
@@ -54,15 +55,15 @@ export const RosterPatternModal = ({ onClose }) => {
         {
           index: 0,
           type: "day",
-          label: "I Smena (06:00 - 14:00)",
-          desc: "Jutarnja 8h",
+          label: r.phase8h1Label,
+          desc: r.phase8h1Desc,
           icon: Sun,
         },
         {
           index: 1,
           type: "day",
-          label: "II Smena (14:00 - 22:00)",
-          desc: "Popodnevna 8h",
+          label: r.phase8h2Label,
+          desc: r.phase8h2Desc,
           icon: Sun,
         },
       ];
@@ -71,22 +72,22 @@ export const RosterPatternModal = ({ onClose }) => {
         {
           index: 0,
           type: "day",
-          label: "I Smena (06:00 - 14:00)",
-          desc: "Jutarnja 8h",
+          label: r.phase8h1Label,
+          desc: r.phase8h1Desc,
           icon: Sun,
         },
         {
           index: 1,
           type: "day",
-          label: "II Smena (14:00 - 22:00)",
-          desc: "Popodnevna 8h",
+          label: r.phase8h2Label,
+          desc: r.phase8h2Desc,
           icon: Sun,
         },
         {
           index: 2,
           type: "night",
-          label: "III Smena (22:00 - 06:00)",
-          desc: "No\u0107na 8h (+26%)",
+          label: r.phase8h3Label,
+          desc: r.phase8h3Desc,
           icon: Moon,
         },
       ];
@@ -219,7 +220,7 @@ export const RosterPatternModal = ({ onClose }) => {
         },
       ];
     }
-  }, [model, t]);
+  }, [model, t, r]);
   const safeStartPhase =
     startPhaseIndex >= modelPhases.length ? 0 : startPhaseIndex;
   const currentConfig = useMemo(
@@ -332,11 +333,10 @@ export const RosterPatternModal = ({ onClose }) => {
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                1. Izaberite model radnog vremena (Standardno 8h ili Turnus 12h)
+                {r.step1Heading}
               </label>
               <p className="text-xs text-slate-500 mt-0.5">
-                Puno radno vreme 40h nedeljno po čl. 51 Zakona o radu RS ili 12h
-                rotacioni turnusi
+                {r.step1Sub}
               </p>
             </div>
 
@@ -344,7 +344,7 @@ export const RosterPatternModal = ({ onClose }) => {
             <div className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
                 <Sun className="w-3.5 h-3.5" />
-                <span>A. Standardno 8h Radno Vreme i 8h Smenski Rad</span>
+                <span>{r.sectionATitle}</span>
               </span>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -361,17 +361,17 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      8h Standardno (40h/ned)
+                      {r.m8hStdTitle}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300">
-                      Pon-Pet
+                      {r.m8hStdBadge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    08:00 – 16:00 (30 min plaćena pauza)
+                    {r.m8hStdDesc}
                   </p>
                   <div className="mt-2 text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
-                    Redovno puno radno vreme
+                    {r.m8hStdTag}
                   </div>
                 </button>
 
@@ -388,17 +388,17 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Dvosmenski rad 8h
+                      {r.m8h2Title}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                      I i II smena
+                      {r.m8h2Badge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    I (06:00-14:00) ➔ II (14:00-22:00)
+                    {r.m8h2Desc}
                   </p>
                   <div className="mt-2 text-[10px] text-amber-600 dark:text-amber-400 font-semibold">
-                    Rotacija jutarnja / popodnevna
+                    {r.m8h2Tag}
                   </div>
                 </button>
 
@@ -417,17 +417,17 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      Trosmenski rad 8h
+                      {r.m8h3Title}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300">
-                      I, II i III noćna
+                      {r.m8h3Badge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    06-14h ➔ 14-22h ➔ 22-06h (+26% noć)
+                    {r.m8h3Desc}
                   </p>
                   <div className="mt-2 text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
-                    Kontinuirana proizvodnja
+                    {r.m8h3Tag}
                   </div>
                 </button>
               </div>
@@ -438,7 +438,7 @@ export const RosterPatternModal = ({ onClose }) => {
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                 <RotateCw className="w-3.5 h-3.5" />
                 <span>
-                  B. Turnusni 12-Časovni Rotacioni Ciklusi (12h Dan / 12h Noć)
+                  {r.sectionBTitle}
                 </span>
               </span>
 
@@ -458,14 +458,14 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      12h Dan/Noć/2 Odmor
+                      {r.m12h4Title}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                      4 dana
+                      {r.m12h4Badge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Dan 12h ➔ Noć 12h ➔ 2 dana odmor
+                    {r.m12h4Desc}
                   </p>
                 </button>
 
@@ -484,14 +484,14 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      12h Dan/Noć/3 Odmor
+                      {r.m12h5Title}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      5 dana
+                      {r.m12h5Badge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Dan 12h ➔ Noć 12h ➔ 3 dana odmor
+                    {r.m12h5Desc}
                   </p>
                 </button>
 
@@ -510,14 +510,14 @@ export const RosterPatternModal = ({ onClose }) => {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      2D / 2N / 4 Odmor
+                      {r.m12h8Title}
                     </span>
                     <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                      8 dana
+                      {r.m12h8Badge}
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    2× Dan 12h ➔ 2× Noć 12h ➔ 4 dana odmor
+                    {r.m12h8Desc}
                   </p>
                 </button>
               </div>
@@ -564,19 +564,19 @@ export const RosterPatternModal = ({ onClose }) => {
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                 >
                   <option value={4}>
-                    4 {t.calendar.week} (to{" "}
+                    4 {t.calendar.week} ({r.toWord}{" "}
                     {formatDate(endDateStr, { short: true })})
                   </option>
                   <option value={8}>
-                    8 {t.calendar.week} (to{" "}
+                    8 {t.calendar.week} ({r.toWord}{" "}
                     {formatDate(endDateStr, { short: true })})
                   </option>
                   <option value={12}>
-                    12 {t.calendar.week} (to{" "}
+                    12 {t.calendar.week} ({r.toWord}{" "}
                     {formatDate(endDateStr, { short: true })})
                   </option>
                   <option value={26}>
-                    26 {t.calendar.week} (to{" "}
+                    26 {t.calendar.week} ({r.toWord}{" "}
                     {formatDate(endDateStr, { short: true })})
                   </option>
                 </select>
@@ -805,8 +805,8 @@ export const RosterPatternModal = ({ onClose }) => {
                     <div className="text-[9px] font-bold uppercase tracking-wider">
                       {isWork
                         ? isNight
-                          ? "12h N"
-                          : "12h D"
+                          ? r.code12hN
+                          : r.code12hD
                         : t.calendar.restDay}
                     </div>
                   </div>

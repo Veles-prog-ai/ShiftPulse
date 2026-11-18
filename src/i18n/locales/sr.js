@@ -356,13 +356,13 @@ export const sr = {
     importDesc:
       "U\u010Ditajte prethodno izvezenu datoteku kako biste povratili sa\u010Duvane podatke.",
     importBtn: "Izaberi datoteku za uvoz",
-    resetTitle: "Vra\u0107anje na po\u010Detne demo podatke",
+    resetTitle: "Brisanje lokalnih podataka radnog prostora",
     resetDesc:
-      "Upozorenje: Ova radnja \u0107e zameniti sve trenutne podatke oglednim primerom poslova i 12h rotacionih smena.",
-    resetBtn: "Vrati po\u010Detne podatke",
+      "Upozorenje: Ova radnja \u0107e trajno obrisati sve lokalno sa\u010Duvane profile klijenata, smene i obra\u010Dune sa ovog ure\u0111aja.",
+    resetBtn: "Obri\u0161i lokalne podatke",
     close: "Zatvori",
     resetConfirm:
-      "Da li ste sigurni da \u017Eelite da vratite demo podatke? Svi nesa\u010Duvani podaci bi\u0107e obrisani.",
+      "Da li ste sigurni da \u017Eelite da obri\u0161ete sve lokalne podatke? Nesa\u010Duvani zapisi bi\u0107e izgubljeni.",
     importSuccess: "Podaci su uspe\u0161no uvezeni!",
     importError:
       "Gre\u0161ka pri \u010Ditanju JSON datoteke. Molimo proverite format.",
@@ -501,8 +501,8 @@ export const sr = {
     activatePro: "Aktiviraj Premium Pro ($3.99/mes)",
     activateTrial: "Zapo\u010Dni 14 dana besplatne Pro probe",
     cancelSubscription:
-      "Vrati se na besplatnu verziju (omogu\u0107i oglase za test)",
-    testModeToggle: "Brza provera re\u017Eima (Besplatno / Pro)",
+      "Vrati na besplatni po\u010Detni paket",
+    testModeToggle: "Aktivni paket licence",
     activeTier: "Trenutni status \u010Dlanstva",
     featureNoAds: "100% bez reklama i banera",
     featureNoAdsDesc:

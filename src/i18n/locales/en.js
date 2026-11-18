@@ -349,13 +349,13 @@ export const en = {
     importDesc:
       "Upload a previously saved ShiftPulse JSON file to restore your entire data state.",
     importBtn: "Select JSON File",
-    resetTitle: "Restore Sample Demo Data",
+    resetTitle: "Clear Local Workspace Data",
     resetDesc:
-      "Warning: This will replace current shifts and jobs with the standard demonstration setup.",
-    resetBtn: "Restore Demo Data",
+      "Warning: This will erase all locally stored client profiles, schedules, and payroll records on this device.",
+    resetBtn: "Clear Local Data",
     close: "Close",
     resetConfirm:
-      "Are you sure you want to reset to demo data? Unsaved changes will be lost.",
+      "Are you sure you want to clear all local workspace data? Unbacked-up data will be permanently removed.",
     importSuccess: "Data successfully restored!",
     importError:
       "Error reading JSON file. Please ensure it is a valid ShiftPulse backup.",
@@ -489,8 +489,8 @@ export const en = {
     perYear: "/year (billed annually)",
     activatePro: "Upgrade to Premium Pro ($3.99/mo)",
     activateTrial: "Start 14-Day Free Pro Trial",
-    cancelSubscription: "Revert to Free Tier (Enable Ads for Testing)",
-    testModeToggle: "Quick Test Mode Switcher",
+    cancelSubscription: "Switch back to Free Starter Tier",
+    testModeToggle: "Current Plan Status",
     activeTier: "Active Membership Status",
     featureNoAds: "100% Ad-Free Experience",
     featureNoAdsDesc:

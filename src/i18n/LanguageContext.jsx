@@ -1,9 +1,39 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { BASE_TRANSLATIONS, SUPPORTED_LANGUAGES } from "./translations";
+import { UI_TRANSLATIONS } from "./uiTranslations";
 import { en } from "./locales/en";
+
 const LANGUAGE_STORAGE_KEY = "shiftpulse_lang_preference_v1";
 const CUSTOM_LANG_STORAGE_KEY = "shiftpulse_custom_languages_v1";
 const LanguageContext = createContext(void 0);
+
+export const getIntlLocale = (lang) => {
+  switch (lang) {
+    case "sr":
+      return "sr-Latn-RS";
+    case "sr-Cyrl":
+      return "sr-Cyrl-RS";
+    case "de":
+      return "de-DE";
+    case "ru":
+      return "ru-RU";
+    case "zh":
+      return "zh-CN";
+    case "ja":
+      return "ja-JP";
+    case "en":
+    default:
+      return "en-US";
+  }
+};
+
+export const interpolate = (template, vars = {}) => {
+  if (typeof template !== "string") return "";
+  return template.replace(/\{\{(\w+)\}\}/g, (_, k) =>
+    vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : "",
+  );
+};
+
 export const LanguageProvider = ({ children }) => {
   const [customLanguages, setCustomLanguages] = useState(() => {
     try {
@@ -16,6 +46,7 @@ export const LanguageProvider = ({ children }) => {
     }
     return [];
   });
+
   const [language, setLanguageState] = useState(() => {
     try {
       const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -35,8 +66,9 @@ export const LanguageProvider = ({ children }) => {
       if (navLang.startsWith("zh")) return "zh";
       if (navLang.startsWith("ja")) return "ja";
     } catch {}
-    return "sr";
+    return "en";
   });
+
   const persistCustomLanguages = (list) => {
     setCustomLanguages(list);
     try {
@@ -45,6 +77,7 @@ export const LanguageProvider = ({ children }) => {
       console.error("Failed to store custom languages:", e);
     }
   };
+
   const setLanguage = (newLang) => {
     setLanguageState(newLang);
     try {
@@ -52,31 +85,37 @@ export const LanguageProvider = ({ children }) => {
       document.documentElement.lang = newLang;
     } catch {}
   };
+
   useEffect(() => {
     try {
       document.documentElement.lang = language;
     } catch {}
   }, [language]);
+
+  const intlLocale = useMemo(() => getIntlLocale(language), [language]);
+
   const supportedLanguages = useMemo(() => {
     const customOptions = customLanguages.map((c) => ({
       code: c.code,
       label: c.label,
       nativeLabel: c.nativeLabel,
-      flag: c.flag || "\u{1F310}",
+      flag: c.flag || "🌐",
       isCustom: true,
     }));
     return [...SUPPORTED_LANGUAGES, ...customOptions];
   }, [customLanguages]);
+
   const t = useMemo(() => {
+    const enFull = { ...en, ui: UI_TRANSLATIONS.en };
     const customMatch = customLanguages.find((c) => c.code === language);
     if (customMatch && customMatch.translations) {
-      return deepMergeFallback(en, customMatch.translations);
+      return deepMergeFallback(enFull, customMatch.translations);
     }
-    if (BASE_TRANSLATIONS[language]) {
-      return BASE_TRANSLATIONS[language];
-    }
-    return BASE_TRANSLATIONS.sr || en;
+    const baseLang = BASE_TRANSLATIONS[language] || en;
+    const uiLang = UI_TRANSLATIONS[language] || UI_TRANSLATIONS.en;
+    return deepMergeFallback(enFull, { ...baseLang, ui: uiLang });
   }, [language, customLanguages]);
+
   const importLanguagePack = (pack) => {
     if (!pack || !pack.code || !pack.nativeLabel || !pack.translations) {
       return {
@@ -92,12 +131,13 @@ export const LanguageProvider = ({ children }) => {
         error: "Cannot override built-in system language codes.",
       };
     }
-    const mergedTranslations = deepMergeFallback(en, pack.translations);
+    const enFull = { ...en, ui: UI_TRANSLATIONS.en };
+    const mergedTranslations = deepMergeFallback(enFull, pack.translations);
     const updatedPack = {
       code: cleanCode,
       label: pack.label || pack.nativeLabel,
       nativeLabel: pack.nativeLabel,
-      flag: pack.flag || "\u{1F310}",
+      flag: pack.flag || "🌐",
       translations: mergedTranslations,
     };
     const existingIndex = customLanguages.findIndex(
@@ -114,20 +154,22 @@ export const LanguageProvider = ({ children }) => {
     setLanguage(cleanCode);
     return { success: true };
   };
+
   const deleteCustomLanguage = (code) => {
     const nextList = customLanguages.filter((c) => c.code !== code);
     persistCustomLanguages(nextList);
     if (language === code) {
-      setLanguage("sr");
+      setLanguage("en");
     }
   };
+
   const downloadTranslationTemplate = () => {
     const templateObject = {
       code: "fr",
       label: "French",
-      nativeLabel: "Fran\xE7ais",
-      flag: "\u{1F1EB}\u{1F1F7}",
-      translations: en,
+      nativeLabel: "Français",
+      flag: "🇫🇷",
+      translations: { ...en, ui: UI_TRANSLATIONS.en },
     };
     const jsonStr = JSON.stringify(templateObject, null, 2);
     const blob = new Blob([jsonStr], { type: "application/json" });
@@ -140,21 +182,25 @@ export const LanguageProvider = ({ children }) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
   const getWeekdayName = (dayIndex0Sun, short = false) => {
     const list = short ? t.calendar.daysOfWeek : t.calendar.daysOfWeekFull;
     return list[dayIndex0Sun % 7];
   };
+
   const getMonthName = (monthIndex0Jan) => {
     return t.calendar.months[monthIndex0Jan % 12];
   };
+
   const formatMonthYear = (date) => {
     const month = getMonthName(date.getMonth());
     const year = date.getFullYear();
     if (language === "zh" || language === "ja") {
-      return `${year}\u5E74 ${month}`;
+      return `${year}年 ${month}`;
     }
     return `${month} ${year}`;
   };
+
   const formatDate = (
     dateStr,
     options = { includeDayOfWeek: true, short: false },
@@ -197,28 +243,30 @@ export const LanguageProvider = ({ children }) => {
         ? `${monthName.slice(0, 3).toLowerCase()}.`
         : monthName.toLowerCase();
       return options.includeDayOfWeek
-        ? `${dayOfWeek}, ${d} ${monthPart2} ${y} \u0433.`
-        : `${d} ${monthPart2} ${y} \u0433.`;
+        ? `${dayOfWeek}, ${d} ${monthPart2} ${y} г.`
+        : `${d} ${monthPart2} ${y} г.`;
     }
     if (language === "zh") {
       return options.includeDayOfWeek
-        ? `${y}\u5E74${m + 1}\u6708${d}\u65E5 ${dayOfWeek}`
-        : `${y}\u5E74${m + 1}\u6708${d}\u65E5`;
+        ? `${y}年${m + 1}月${d}日 ${dayOfWeek}`
+        : `${y}年${m + 1}月${d}日`;
     }
     if (language === "ja") {
       return options.includeDayOfWeek
-        ? `${y}\u5E74${m + 1}\u6708${d}\u65E5(${dayOfWeek})`
-        : `${y}\u5E74${m + 1}\u6708${d}\u65E5`;
+        ? `${y}年${m + 1}月${d}日(${dayOfWeek})`
+        : `${y}年${m + 1}月${d}日`;
     }
     const monthPart = options.short ? monthName.slice(0, 3) : monthName;
     return options.includeDayOfWeek
       ? `${dayOfWeek}, ${monthPart} ${d}, ${y}`
       : `${monthPart} ${d}, ${y}`;
   };
+
   const value = useMemo(
     () => ({
       language,
       setLanguage,
+      intlLocale,
       t,
       supportedLanguages,
       customLanguages,
@@ -230,14 +278,16 @@ export const LanguageProvider = ({ children }) => {
       getWeekdayName,
       getMonthName,
     }),
-    [language, t, supportedLanguages, customLanguages],
+    [language, intlLocale, t, supportedLanguages, customLanguages],
   );
+
   return (
     <LanguageContext.Provider value={value}>
       {children}
     </LanguageContext.Provider>
   );
 };
+
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
   if (!context) {
@@ -245,6 +295,7 @@ export const useLanguage = () => {
   }
   return context;
 };
+
 function deepMergeFallback(fallback, custom) {
   if (!custom || typeof custom !== "object") return fallback;
   const result = { ...fallback };

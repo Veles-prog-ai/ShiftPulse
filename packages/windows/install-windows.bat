@@ -1,9 +1,9 @@
 @echo off
-title ShiftPulse Ledger Pro - Windows Installer (Live Testing)
+title ShiftPulse Ledger Pro - Commercial Workstation Installer (v1.0 RS)
 color 0b
 echo ======================================================================
-echo          ShiftPulse Ledger Pro - B2B SaaS Windows Installer
-echo                  Paket za testiranje uzivo (Windows 10/11)
+echo       ShiftPulse Ledger Pro - Commercial B2B Workstation Setup
+echo            Republic of Serbia v1.0 Edition (Windows 10/11)
 echo ======================================================================
 echo.
 
@@ -37,8 +37,23 @@ if exist package.json (
 )
 echo.
 
-:: 3. Kreiranje precice na radnoj povrsini (Desktop Shortcut)
-echo [3/3] Kreiranje precice za radnu povrsinu...
+:: 3. Kreiranje organizovanih foldera za offline rad (ShiftPulse_Workspace)
+echo [3/4] Kreiranje radnih foldera za dokumentaciju...
+set WS_DIR=%USERPROFILE%\Documents\ShiftPulse_Workspace
+mkdir "%WS_DIR%\01_Ulaz_Dokumenta\Fakture_Racuni" 2>nul
+mkdir "%WS_DIR%\01_Ulaz_Dokumenta\Otpremnice" 2>nul
+mkdir "%WS_DIR%\01_Ulaz_Dokumenta\POS_Slipovi_Fiskalni" 2>nul
+mkdir "%WS_DIR%\01_Ulaz_Dokumenta\Bankarski_Izvodi" 2>nul
+mkdir "%WS_DIR%\01_Ulaz_Dokumenta\Obrada_Zavrseno" 2>nul
+mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Bilansi_Porezi_CSV" 2>nul
+mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Zarade_ePorezi_XML" 2>nul
+mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Virmani_Nalozi" 2>nul
+mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Arhiva_Ugovori" 2>nul
+mkdir "%WS_DIR%\03_Korisnicki_Backup" 2>nul
+echo ShiftPulse Workspace: %WS_DIR%
+
+:: 4. Kreiranje precice na radnoj povrsini (Desktop Shortcut)
+echo [4/4] Kreiranje precice za radnu povrsinu...
 set SCRIPT_DIR=%~dp0
 set TARGET_SCRIPT=%SCRIPT_DIR%start-windows.bat
 set SHORTCUT_PATH=%USERPROFILE%\Desktop\ShiftPulse Ledger Pro.lnk
@@ -52,6 +67,7 @@ if exist "%SHORTCUT_PATH%" (
 echo.
 echo ======================================================================
 echo   Instalacija je uspesno zavrsena!
+echo   Radni folder: %WS_DIR%
 echo   Pokrecem aplikaciju...
 echo ======================================================================
 echo.
