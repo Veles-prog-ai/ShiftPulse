@@ -304,8 +304,9 @@
       </div>
       <div class="top-actions">
         <span class="badge" id="server-status-badge"><span class="dot" id="server-status-dot"></span> <span id="server-status-text">Povezivanje...</span></span>
-        <a class="btn-link" href="/site">Javni Sajt (/site)</a>
+        <a class="btn-link" href="https://veles-lab.com">Javni Sajt (veles-lab.com)</a>
         <a class="btn-link" href="/install">Instalacioni Portal (/install)</a>
+        <button onclick="promptAdminToken()">Admin Ključ</button>
         <button class="primary" onclick="refreshAll()">Osveži Sve</button>
       </div>
     </div>
@@ -659,12 +660,65 @@
       if (expEl) expEl.value = iso;
     })();
 
+    let adminAuthPrompted = false;
+
+    function getAdminSecret() {
+      try {
+        return sessionStorage.getItem("shiftpulse_admin_secret") || "";
+      } catch {
+        return "";
+      }
+    }
+
+    function promptAdminToken(force = true) {
+      if (!force && adminAuthPrompted) return "";
+      adminAuthPrompted = true;
+      const entered = window.prompt(
+        "Unesite ADMIN_SECRET_KEY za pristup Admin Konzoli i generisanju licenci:",
+        getAdminSecret()
+      );
+      if (entered !== null) {
+        const cleaned = entered.trim();
+        try {
+          if (cleaned) {
+            sessionStorage.setItem("shiftpulse_admin_secret", cleaned);
+          } else {
+            sessionStorage.removeItem("shiftpulse_admin_secret");
+          }
+        } catch {}
+        return cleaned;
+      }
+      return "";
+    }
+
+    async function adminFetch(url, options = {}) {
+      const headers = new Headers(options.headers || {});
+      const secret = getAdminSecret();
+      if (secret && !headers.has("x-admin-secret")) {
+        headers.set("x-admin-secret", secret);
+      }
+      let res = await fetch(url, { ...options, headers, credentials: "same-origin" });
+      if (res.status === 401) {
+        const nextSecret = promptAdminToken(true);
+        if (nextSecret) {
+          headers.set("x-admin-secret", nextSecret);
+          res = await fetch(url, { ...options, headers, credentials: "same-origin" });
+        }
+      }
+      return res;
+    }
+
     async function fetchOverview() {
       try {
         const [ovRes, licRes] = await Promise.all([
-          fetch("/api/admin/overview"),
+          adminFetch("/api/admin/overview"),
           fetch("/api/license/status"),
         ]);
+        if (ovRes.status === 401) {
+          document.getElementById("server-status-dot").className = "dot bad";
+          document.getElementById("server-status-text").textContent = "Potrebna Autorizacija (401)";
+          return;
+        }
         const ov = await ovRes.json();
         const lic = await licRes.json();
 
@@ -728,7 +782,7 @@
         return;
       }
       try {
-        const res = await fetch("/api/license/admin-generate", {
+        const res = await adminFetch("/api/license/admin-generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ nazivAgencije, pibAgencije, maksimalnoRadnika, datumIsteka }),
@@ -893,7 +947,7 @@
       btn.disabled = true;
       btn.textContent = "Provera u toku...";
       try {
-        const res = await fetch("/api/legal-monitor/check-now", { method: "POST" });
+        const res = await adminFetch("/api/legal-monitor/check-now", { method: "POST" });
         const data = await res.json();
         await fetchLegalMonitor();
         showNotice(
@@ -917,7 +971,7 @@
       const severity = document.getElementById("cmp-severity").value;
 
       try {
-        const res = await fetch("/api/legal-monitor/compare", {
+        const res = await adminFetch("/api/legal-monitor/compare", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lawId, updatedText, articleLabel, summaryNote, severity }),
@@ -1013,7 +1067,7 @@
     async function acknowledgeActiveNotification(adoptAsBaseline) {
       if (!activeNotifId) return;
       try {
-        const res = await fetch(
+        const res = await adminFetch(
           `/api/legal-monitor/notifications/${encodeURIComponent(activeNotifId)}/acknowledge`,
           {
             method: "POST",
@@ -1034,7 +1088,8 @@
 
     async function fetchHitlLogs() {
       try {
-        const res = await fetch("/api/hitl/logs");
+        const res = await adminFetch("/api/hitl/logs");
+        if (res.status === 401) return;
         const data = await res.json();
         cachedHitlLogs = data.logs || [];
         document.getElementById("kpi-hitl").textContent = String(data.totalCount ?? cachedHitlLogs.length);
@@ -1140,7 +1195,7 @@
       const out = document.getElementById("diag-output");
       const t0 = performance.now();
       try {
-        const res = await fetch(path);
+        const res = await adminFetch(path);
         const text = await res.text();
         const ms = Math.round(performance.now() - t0);
         let formatted = text;

@@ -23,6 +23,141 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+// ========================================================
+// MULTI-SUBDOMAIN CORS & ADMIN AUTHENTICATION MIDDLEWARE
+// ========================================================
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://veles-lab.com",
+  "https://www.veles-lab.com",
+  "https://app.veles-lab.com",
+];
+
+function getConfiguredAllowedOrigins() {
+  const extra = [
+    process.env.APP_URL || "",
+    process.env.CORS_ALLOWED_ORIGINS || "",
+  ]
+    .join(",")
+    .split(",")
+    .map((s) => s.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+  const devOrigins =
+    process.env.NODE_ENV !== "production"
+      ? [
+          `http://localhost:${PORT}`,
+          `http://127.0.0.1:${PORT}`,
+          "http://localhost:5173",
+        ]
+      : [];
+
+  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...extra, ...devOrigins]);
+}
+
+function isOriginAllowed(origin, req) {
+  if (!origin) return true;
+  const normalized = String(origin).trim().replace(/\/+$/, "");
+  const allowedSet = getConfiguredAllowedOrigins();
+  if (allowedSet.has(normalized)) return true;
+
+  const host = String(req.headers.host || "").toLowerCase();
+  if (
+    host &&
+    (normalized.toLowerCase() === `https://${host}` ||
+      normalized.toLowerCase() === `http://${host}`)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && isOriginAllowed(origin, req)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader(
+      "Access-Control-Allow-Methods",
+      "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+    );
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, x-admin-secret, x-license-key",
+    );
+  }
+  if (req.method === "OPTIONS") {
+    if (origin && !isOriginAllowed(origin, req)) {
+      return res.status(403).json({ success: false, error: "Origin not allowed by CORS policy." });
+    }
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+function timingSafeEqualString(a, b) {
+  const bufA = Buffer.from(String(a || ""), "utf8");
+  const bufB = Buffer.from(String(b || ""), "utf8");
+  if (bufA.length !== bufB.length || bufA.length === 0) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function extractAdminSecretFromRequest(req) {
+  const headerToken = req.headers["x-admin-secret"];
+  if (typeof headerToken === "string" && headerToken.trim()) {
+    return headerToken.trim();
+  }
+
+  const authHeader = String(req.headers.authorization || "");
+  if (authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+  if (authHeader.startsWith("Basic ")) {
+    try {
+      const decoded = Buffer.from(authHeader.slice(6).trim(), "base64").toString("utf8");
+      const colonIdx = decoded.indexOf(":");
+      return colonIdx >= 0 ? decoded.slice(colonIdx + 1) : decoded;
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
+function requireAdminAuth(req, res, next) {
+  const configuredSecret = String(process.env.ADMIN_SECRET_KEY || "").trim();
+  const isApiRequest = req.path.startsWith("/api/") || req.originalUrl.startsWith("/api/");
+
+  if (!configuredSecret) {
+    if (!isApiRequest) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Admin Console", charset="UTF-8"');
+      return res
+        .status(401)
+        .send("Unauthorized: ADMIN_SECRET_KEY is not configured on the server.");
+    }
+    return res.status(401).json({
+      success: false,
+      error: "Unauthorized: ADMIN_SECRET_KEY is not configured on the server.",
+    });
+  }
+
+  const providedSecret = extractAdminSecretFromRequest(req);
+  if (!timingSafeEqualString(providedSecret, configuredSecret)) {
+    if (!isApiRequest) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Admin Console", charset="UTF-8"');
+      return res
+        .status(401)
+        .send("Unauthorized: Valid admin credentials are required.");
+    }
+    return res.status(401).json({
+      success: false,
+      error: "Unauthorized: Valid ADMIN_SECRET_KEY credentials are required.",
+    });
+  }
+
+  next();
+}
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -386,7 +521,7 @@ const pluginManager = new BackendPluginManager({
   resolveLicenseStatus: resolveLicenseStatusSnapshot,
 });
 
-app.post("/api/license/admin-generate", (req, res) => {
+app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
   try {
     const { pibAgencije, nazivAgencije, maksimalnoRadnika, datumIsteka, tier } =
       req.body || {};
@@ -824,7 +959,7 @@ app.post("/api/hitl/log-approval", (req, res) => {
   }
 });
 
-app.get("/api/hitl/logs", (_req, res) => {
+app.get("/api/hitl/logs", requireAdminAuth, (_req, res) => {
   try {
     if (!fs.existsSync(HITL_AUDIT_LOG_FILE)) {
       return res.json({
@@ -1178,6 +1313,8 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+app.use("/api/admin", requireAdminAuth);
+
 app.get("/api/admin/overview", (_req, res) => {
   try {
     const mem = process.memoryUsage();
@@ -1228,7 +1365,7 @@ app.get("/api/legal-monitor/status", (_req, res) => {
   res.json(legalMonitorService.getStatus());
 });
 
-app.post("/api/legal-monitor/check-now", async (_req, res) => {
+app.post("/api/legal-monitor/check-now", requireAdminAuth, async (_req, res) => {
   try {
     const result = await legalMonitorService.runLightweightHttpChecks();
     res.json(result);
@@ -1237,7 +1374,7 @@ app.post("/api/legal-monitor/check-now", async (_req, res) => {
   }
 });
 
-app.post("/api/legal-monitor/compare", (req, res) => {
+app.post("/api/legal-monitor/compare", requireAdminAuth, (req, res) => {
   try {
     const { lawId, updatedText, articleLabel, summaryNote, severity } = req.body || {};
     const outcome = legalMonitorService.compareClauseAndNotifyAdmin({
@@ -1256,7 +1393,7 @@ app.post("/api/legal-monitor/compare", (req, res) => {
   }
 });
 
-app.post("/api/legal-monitor/notifications/:id/acknowledge", (req, res) => {
+app.post("/api/legal-monitor/notifications/:id/acknowledge", requireAdminAuth, (req, res) => {
   try {
     const { adoptAsBaseline } = req.body || {};
     const outcome = legalMonitorService.acknowledgeNotification(req.params.id, {
@@ -1392,7 +1529,7 @@ app.get("/install", (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "install.html"));
 });
 
-app.get("/admin", (_req, res) => {
+app.get(["/admin", "/admin.html"], requireAdminAuth, (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "admin.html"));
 });
 
