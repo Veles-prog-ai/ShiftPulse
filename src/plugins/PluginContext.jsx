@@ -24,8 +24,18 @@ export const PluginProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    pluginManager.syncAndLoadPlugins();
-  }, [license?.valid, license?.kljuc, license?.licenciraniPravniSubjekat]);
+    let cachedKey = "";
+    try {
+      cachedKey = localStorage.getItem("shiftpulse_license_key_v1") || "";
+    } catch {}
+    pluginManager.syncAndLoadPlugins({ licenseKeyOverride: cachedKey });
+  }, [
+    license?.valid,
+    license?.licenseType,
+    license?.readOnlyLock,
+    license?.kljuc,
+    license?.licenciraniPravniSubjekat,
+  ]);
 
   return (
     <PluginContext.Provider

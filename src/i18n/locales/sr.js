@@ -48,7 +48,7 @@ export const sr = {
     aiCopilot: "AI Kopilot",
   },
   header: {
-    appName: "ShiftPulse Ledger Pro",
+    appName: "ShiftPulse Ledger",
     subtitle: "Knjigovodstveni sistem & PPP-PD ePorezi",
     allJobs: "Svi poslovi",
     clockedIn: "Smena u toku",
@@ -438,7 +438,7 @@ export const sr = {
     privacySection1Title:
       "Lokalna arhitektura i nula neovla\u0161\u0107enog deljenja podataka",
     privacySection1Body:
-      "ShiftPulse sve Va\u0161e unete podatke\u2014uklju\u010Duju\u0107i profile poslodavaca, satnice, raspored smena, evidenciju pauza i sa\u010Duvane kontakte nadre\u0111enih\u2014\u010Duva isklju\u010Divo lokalno na Va\u0161em ure\u0111aju (u skladi\u0161tu veb pregleda\u010Da - localStorage). Aplikacija ne vodi centralizovanu bazu korisni\u010Dkih podataka, ne profilira korisnike za ogla\u0161avanje i nikada ne prosle\u0111uje niti prodaje podatke o Va\u0161em radnom anga\u017Eovanju tre\u0107im licima.",
+      "ShiftPulse Ledger sve Va\u0161e unete podatke\u2014uklju\u010Duju\u0107i profile poslodavaca, satnice, raspored smena, evidenciju pauza i sa\u010Duvane kontakte nadre\u0111enih\u2014\u010Duva isklju\u010Divo lokalno na Va\u0161em ure\u0111aju (u skladi\u0161tu veb pregleda\u010Da - localStorage). Aplikacija ne vodi centralizovanu bazu korisni\u010Dkih podataka, ne profilira korisnike za ogla\u0161avanje i nikada ne prosle\u0111uje niti prodaje podatke o Va\u0161em radnom anga\u017Eovanju tre\u0107im licima.",
     privacySection2Title:
       "Puno vlasni\u0161tvo i prenosivost podataka jednim klikom",
     privacySection2Body:
@@ -446,16 +446,16 @@ export const sr = {
     disclaimerSection1Title:
       "Pravno odricanje od odgovornosti za obra\u010Dun zarade",
     disclaimerSection1Body:
-      "ShiftPulse je alat za li\u010Dnu organizaciju, planiranje i evidenciju smenskog rada. Prora\u010Duni bruto zarade, no\u0107nog rada, prekovremenih sati i odbitaka za pauze predstavljaju automatizovane procene namenjene li\u010Dnoj evidenciji i kontroli smena. Ovi prora\u010Duni NE predstavljaju zvani\u010Dan poreski, pravni, niti ra\u010Dunovodstveni savet.",
+      "ShiftPulse Ledger je alat za li\u010Dnu organizaciju, planiranje i evidenciju smenskog rada. Prora\u010Duni bruto zarade, no\u0107nog rada, prekovremenih sati i odbitaka za pauze predstavljaju automatizovane procene namenjene li\u010Dnoj evidenciji i kontroli smena. Ovi prora\u010Duni NE predstavljaju zvani\u010Dan poreski, pravni, niti ra\u010Dunovodstveni savet.",
     disclaimerSection2Title: "Zvani\u010Dni platni listi\u0107 i provera",
     disclaimerSection2Body:
       "Poreske stope, doprinosi za socijalno i penzijsko osiguranje, \u010Dlanarine i specifi\u010Dni kolektivni ugovori zavise od zakonodavstva i ugovora. Uvek proverite svoja primanja u odnosu na zvani\u010Dni platni listi\u0107 (obra\u010Dun zarade) koji Vam dostavlja poslodavac.",
     laborLawTitle: "Uskla\u0111enost sa Zakonom o radu i direktivama o odmoru",
     laborLawBody:
-      "Referentni modeli ugra\u0111eni u ShiftPulse osmi\u0161ljeni su u skladu sa standardnim radnopravnim propisima, uklju\u010Duju\u0107i Zakon o radu Republike Srbije (\u010Dlan 69. o uve\u0107anju zarade za no\u0107ni rad od najmanje 26%, kao i \u010Dlan o dnevnom odmoru od najmanje 11 neprekidnih sati u okviru 24 sata) i Direktivu EU o radnom vremenu (2003/88/EC). Ova obave\u0161tenja imaju informativni karakter i ne zamenjuju zakonske obaveze poslodavca i zaposlenog.",
+      "Referentni modeli ugra\u0111eni u ShiftPulse Ledger osmi\u0161ljeni su u skladu sa standardnim radnopravnim propisima, uklju\u010Duju\u0107i Zakon o radu Republike Srbije (\u010Dlan 69. o uve\u0107anju zarade za no\u0107ni rad od najmanje 26%, kao i \u010Dlan o dnevnom odmoru od najmanje 11 neprekidnih sati u okviru 24 sata) i Direktivu EU o radnom vremenu (2003/88/EC). Ova obave\u0161tenja imaju informativni karakter i ne zamenjuju zakonske obaveze poslodavca i zaposlenog.",
     integrationsTitle: "Direktna komunikacija i eksterni linkovi",
     integrationsBody:
-      "Prilikom kori\u0161\u0107enja opcija za povezivanje sa servisima elektronske po\u0161te, LinkedIn-om, WhatsApp-om, Telegram-om ili eksternim kalendarima, ShiftPulse generi\u0161e standardne klijentske linkove i protokole (kao \u0161to su mailto:, https://wa.me/ i eksterni URL-ovi). Aplikacija ne \u010Duva Va\u0161e lozinke, OAuth tokene niti ima uvid u Va\u0161e privatne poruke. Svako slanje poruke obavlja se isklju\u010Divo preko Va\u0161e eksterne aplikacije uz Va\u0161u neposrednu potvrdu.",
+      "Prilikom kori\u0161\u0107enja opcija za povezivanje sa servisima elektronske po\u0161te, LinkedIn-om, WhatsApp-om, Telegram-om ili eksternim kalendarima, ShiftPulse Ledger generi\u0161e standardne klijentske linkove i protokole (kao \u0161to su mailto:, https://wa.me/ i eksterni URL-ovi). Aplikacija ne \u010Duva Va\u0161e lozinke, OAuth tokene niti ima uvid u Va\u0161e privatne poruke. Svako slanje poruke obavlja se isklju\u010Divo preko Va\u0161e eksterne aplikacije uz Va\u0161u neposrednu potvrdu.",
   },
   customLang: {
     title: "Upravlja\u010D prilago\u0111enim jezicima",
@@ -478,7 +478,7 @@ export const sr = {
     templateDownloaded:
       "\u0160ablon za prevod je preuzet! Popunite ga u bilo kom tekstualnom editoru i uvezite ovde.",
     validationNotice:
-      "Prilago\u0111eni jezi\u010Dki paketi se automatski proveravaju u odnosu na kompletnu ShiftPulse \u0161emu i \u010Duvaju lokalno na Va\u0161em ure\u0111aju.",
+      "Prilago\u0111eni jezi\u010Dki paketi se automatski proveravaju u odnosu na kompletnu ShiftPulse Ledger \u0161emu i \u010Duvaju lokalno na Va\u0161em ure\u0111aju.",
   },
   premium: {
     freeBadge: "Besplatna verzija",
@@ -489,8 +489,8 @@ export const sr = {
     removeAds: "Ukloni reklame",
     sponsored: "Sponzorisano",
     adNotice:
-      "Oglas \u2022 Podr\u017Eite ShiftPulse ili uklonite oglase prelaskom na Pro",
-    modalTitle: "ShiftPulse Premium Pro",
+      "Oglas \u2022 Podr\u017Eite ShiftPulse Ledger ili uklonite oglase prelaskom na Pro",
+    modalTitle: "ShiftPulse Ledger",
     modalSubtitle:
       "Podignite evidenciju smena na vi\u0161i nivo: neograni\u010Deni poslovi, cirkadijalni kalkulator oporavka sna, automatska sinhronizacija i rad bez reklama.",
     monthly: "Mese\u010Dni plan",
@@ -526,9 +526,9 @@ export const sr = {
     unlimitedJobsLocked:
       "Besplatna verzija podr\u017Eava do 2 radna mesta. Pre\u0111ite na Pro za neograni\u010Dene poslove!",
     exportCsvLocked:
-      "Izvoz detaljne CSV platne liste je ekskluzivna ShiftPulse Pro funkcija.",
+      "Izvoz detaljne CSV platne liste je ekskluzivna ShiftPulse Ledger funkcija.",
     advancedRosterLocked:
-      "Kontinentalna 8-dnevna rotacija je dostupna samo u ShiftPulse Pro verziji.",
+      "Kontinentalna 8-dnevna rotacija je dostupna samo u ShiftPulse Ledger verziji.",
     circadianTitle: "Cirkadijalni kalkulator sna i oporavka",
     circadianSubtitle:
       "Personalizovane preporuke za optimizaciju sna i ubla\u017Eavanje umora pri rotaciji dnevnih i no\u0107nih smena.",

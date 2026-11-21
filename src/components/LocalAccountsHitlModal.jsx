@@ -17,6 +17,8 @@ import {
   RefreshCw,
   Check,
   AlertTriangle,
+  Globe,
+  Scale,
 } from "lucide-react";
 
 export const LocalAccountsHitlModal = ({ onClose }) => {
@@ -51,10 +53,38 @@ export const LocalAccountsHitlModal = ({ onClose }) => {
   const [serverTotalCount, setServerTotalCount] = useState(0);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  const [packStatus, setPackStatus] = useState(null);
+  const [jurisdictionFilter, setJurisdictionFilter] = useState("ALL");
+
+  const fetchLegalMonitorStatus = async (countryParam = "ALL") => {
+    try {
+      const qs =
+        countryParam && countryParam !== "ALL"
+          ? `?country=${encodeURIComponent(countryParam)}`
+          : "";
+      const res = await fetch(`/api/legal-monitor/status${qs}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.success) {
+        setPackStatus(data);
+      }
+    } catch {
+      // Offline mode - ignore gracefully
+    }
+  };
+
+  useEffect(() => {
+    fetchLegalMonitorStatus(jurisdictionFilter);
+  }, [jurisdictionFilter]);
+
   const fetchServerHitlLogs = async () => {
     setLoadingLogs(true);
     try {
       const res = await fetch("/api/hitl/logs");
+      if (!res.ok) {
+        setLoadingLogs(false);
+        return;
+      }
       const data = await res.json();
       if (data?.success) {
         setServerLogs(data.logs || []);
@@ -83,6 +113,16 @@ export const LocalAccountsHitlModal = ({ onClose }) => {
       pin: newPin.trim(),
       hitlPolicy: newPolicy,
     });
+    if (!created || created.error) {
+      setFeedback({
+        type: "error",
+        text:
+          created?.error === "LIMIT_SEATS"
+            ? interpolate(a.limitSeatsReached || "", { max: created.max || 5 })
+            : t.ui.licenseModalFull?.blockedWriteErr || a.errBadPin,
+      });
+      return;
+    }
     setNewDisplayName("");
     setNewUsername("");
     setNewPin("");
@@ -218,6 +258,115 @@ export const LocalAccountsHitlModal = ({ onClose }) => {
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-6 text-xs">
+          {/* Country Pack & HITL Verification Status Banner */}
+          {packStatus && (
+            <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/50 dark:bg-indigo-950/25 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 font-bold text-slate-900 dark:text-white text-xs">
+                  <Scale className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                  <span>{a.packStatusTitle}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-mono">
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold">
+                    {interpolate(a.packActiveCountry || "{{code}}", {
+                      code: packStatus.activeCountryCode || "RS",
+                      name: packStatus.activePack?.countryName || "Serbia",
+                    })}
+                  </span>
+                  {packStatus.activePack?.taxRulesVersion && (
+                    <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                      {interpolate(a.packRulesVer || "v{{ver}}", {
+                        ver: packStatus.activePack.taxRulesVersion,
+                      })}
+                    </span>
+                  )}
+                  {packStatus.activePack?.requiredHitlVerification !== false && (
+                    <span className="px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold">
+                      {a.packHitlReq}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                <div>
+                  {packStatus.activePack?.lastVerifiedByOperator?.verifiedBy ? (
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                      {interpolate(a.packVerifiedBy || "", {
+                        name: packStatus.activePack.lastVerifiedByOperator.verifiedBy,
+                        date: packStatus.activePack.lastVerifiedByOperator.verifiedAt
+                          ? new Date(
+                              packStatus.activePack.lastVerifiedByOperator.verifiedAt,
+                            ).toLocaleDateString(intlLocale)
+                          : "",
+                      })}
+                    </span>
+                  ) : (
+                    <span>{a.packUnverified}</span>
+                  )}
+                </div>
+
+                {/* Jurisdiction Filter */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Globe className="w-3.5 h-3.5 text-slate-400 mr-0.5" />
+                  <span className="text-slate-500 dark:text-slate-400 mr-1">
+                    {a.packFilterLabel}
+                  </span>
+                  {["ALL", "RS", "HR", "SI", "ME", "DE"].map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setJurisdictionFilter(code)}
+                      className={`px-2 py-0.5 rounded font-mono text-[10px] font-bold transition-colors cursor-pointer ${
+                        jurisdictionFilter === code
+                          ? "bg-indigo-600 text-white"
+                          : "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      {code === "ALL" ? a.packFilterAll : code}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {packStatus.lawTrackerSla && !packStatus.lawTrackerSla.active && (
+                <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px] flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{a.slaPausedBanner}</span>
+                </div>
+              )}
+
+              <div className="pt-1 border-t border-indigo-200/70 dark:border-indigo-900/50 space-y-1.5">
+                <div className="font-semibold text-[11px] text-slate-700 dark:text-slate-300">
+                  {interpolate(a.watchedLawsTitle || "{{count}}", {
+                    count: (packStatus.laws || []).length,
+                  })}
+                </div>
+                {(packStatus.laws || []).length === 0 ? (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {a.noWatchedLaws}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {(packStatus.laws || []).slice(0, 4).map((law) => (
+                      <div
+                        key={law.id}
+                        className="px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px]"
+                      >
+                        <span className="truncate font-medium text-slate-800 dark:text-slate-200">
+                          [{law.countryCode || "RS"}] {law.title}
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                          {law.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {feedback && (
             <div
               className={`p-3 rounded-xl border flex items-center justify-between gap-2 ${

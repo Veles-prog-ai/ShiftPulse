@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# ShiftPulse Ledger Pro - Linux Start Launcher
+# ShiftPulse Ledger - Linux Start Launcher
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 echo -e "\033[1;36m======================================================================\033[0m"
-echo -e "\033[1;36m       ShiftPulse Ledger Pro - Pokretanje na Linux sistemu            \033[0m"
+echo -e "\033[1;36m       ShiftPulse Ledger - Pokretanje na Linux sistemu            \033[0m"
 echo -e "\033[1;36m======================================================================\033[0m"
 echo ""
 echo -e "\033[1;33m[INFO] Pokrecem lokalni server na http://localhost:3000...\033[0m"

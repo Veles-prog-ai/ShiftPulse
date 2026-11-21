@@ -69,10 +69,10 @@ Notes: ${shift.notes || "None"}`;
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//ShiftPulse//Work Shift Calendar//EN",
+    "PRODID:-//ShiftPulse Ledger//Work Shift Calendar//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "X-WR-CALNAME:ShiftPulse Roster",
+    "X-WR-CALNAME:ShiftPulse Ledger Roster",
     "X-WR-TIMEZONE:UTC",
     ...events,
     "END:VCALENDAR",

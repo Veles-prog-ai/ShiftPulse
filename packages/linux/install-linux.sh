@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # ======================================================================
-# ShiftPulse Ledger Pro - Linux Installer (Ubuntu / Debian / Fedora / Arch)
+# ShiftPulse Ledger - Linux Installer (Ubuntu / Debian / Fedora / Arch)
 # Commercial B2B Workstation Bundle (v1.0 RS)
 # ======================================================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_NAME="ShiftPulse Ledger Pro"
+APP_NAME="ShiftPulse Ledger"
 DESKTOP_DIR="${HOME}/.local/share/applications"
 ICON_DIR="${HOME}/.local/share/icons/hicolor/scalable/apps"
 
 echo -e "\033[1;36m======================================================================\033[0m"
-echo -e "\033[1;36m     ShiftPulse Ledger Pro - Linux Workstation Installer (v1.0 RS)    \033[0m"
+echo -e "\033[1;36m     ShiftPulse Ledger - Linux Workstation Installer (v1.0 RS)    \033[0m"
 echo -e "\033[1;36m======================================================================\033[0m"
 echo ""
 
@@ -87,7 +87,7 @@ echo -e "\033[1;32m  Precica je dodata u vas sistemski meni (GNOME / KDE / XFCE)
 echo -e "\033[1;32m======================================================================\033[0m"
 echo ""
 
-read -p "Zelite li odmah da pokrenete ShiftPulse Ledger Pro? (Y/n): " -n 1 -r
+read -p "Zelite li odmah da pokrenete ShiftPulse Ledger? (Y/n): " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
     exec "${SCRIPT_DIR}/start-linux.sh"

@@ -1,7 +1,7 @@
 {
-  "id": "com.shiftpulse.ledgerpro.chromeos",
-  "name": "ShiftPulse Ledger Pro - ChromeOS Enterprise",
-  "short_name": "ShiftPulse",
+  "id": "com.shiftpulse.ledger.chromeos",
+  "name": "ShiftPulse Ledger - ChromeOS Enterprise",
+  "short_name": "ShiftPulse Ledger",
   "description": "B2B Bookkeeping, Shift Management & ePorezi PPP-PD for ChromeOS & Chromebooks",
   "start_url": "/?platform=chromeos",
   "scope": "/",

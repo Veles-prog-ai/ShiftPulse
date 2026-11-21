@@ -53,6 +53,8 @@ export const LedgerDashboardView = () => {
     workspaceConnected,
     saveOutputDocumentToWorkspace,
     openCommHub,
+    isReadOnlyLocked,
+    setLicenseActionError,
   } = useShift();
   const { t, intlLocale } = useLanguage();
   const l = t.ui.ledgerFull;
@@ -185,6 +187,10 @@ ${stavkeXml}
   };
   const handleDownloadXml = async () => {
     if (!activeCompany) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     try {
       await pluginManager.runBeforeReportExportHooks({
         reportType: "ppp-pd-xml",
@@ -234,7 +240,7 @@ ${stavkeXml}
   const handleCreateCompany = (e) => {
     e.preventDefault();
     if (!companyForm.naziv.trim() || !companyForm.pib.trim()) return;
-    addCompany({
+    const createdComp = addCompany({
       naziv: companyForm.naziv,
       pib: companyForm.pib,
       maticniBroj: companyForm.maticniBroj,
@@ -245,6 +251,10 @@ ${stavkeXml}
       delatnost: companyForm.delatnost,
       kontaktEmail: companyForm.kontaktEmail,
     });
+    if (!createdComp) {
+      setIsAddCompanyOpen(false);
+      return;
+    }
     setIsAddCompanyOpen(false);
     setCompanyForm({
       naziv: "",
@@ -260,6 +270,11 @@ ${stavkeXml}
   const handleCreateEmployee = (e) => {
     e.preventDefault();
     if (!activeCompany || !empForm.ime.trim() || !empForm.jmbg.trim()) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      setIsAddEmployeeOpen(false);
+      return;
+    }
     if (editingEmp) {
       updateEmployee(editingEmp.id, {
         ime: empForm.ime,
@@ -275,7 +290,7 @@ ${stavkeXml}
       });
       setEditingEmp(null);
     } else {
-      addEmployee({
+      const createdEmp = addEmployee({
         companyId: activeCompany.id,
         ime: empForm.ime,
         jmbg: empForm.jmbg,
@@ -290,6 +305,10 @@ ${stavkeXml}
           empForm.opstinaPrebivalista || activeCompany.opstina_kod,
         kompletan: false,
       });
+      if (!createdEmp) {
+        setIsAddEmployeeOpen(false);
+        return;
+      }
     }
     setIsAddEmployeeOpen(false);
     setEmpForm({
@@ -323,6 +342,10 @@ ${stavkeXml}
   };
   const handleExportCsv = async () => {
     if (!activeCompany || currentEmployees.length === 0) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     await pluginManager.runBeforeReportExportHooks({
       reportType: "payroll-csv",
       activeCompany,

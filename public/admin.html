@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ShiftPulse Ledger Pro — Admin Konzola Servera</title>
+  <title>ShiftPulse Ledger — Admin Konzola Servera</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -296,9 +296,9 @@
   <header>
     <div class="wrap topbar">
       <div class="brand">
-        <img src="/icon.svg" alt="ShiftPulse" />
+        <img src="/icon.svg" alt="ShiftPulse Ledger" />
         <div>
-          <div class="brand-title">ShiftPulse Ledger Pro — Admin Konzola</div>
+          <div class="brand-title">ShiftPulse Ledger — Admin Konzola</div>
           <div class="brand-sub">Direktna komunikacija sa serverom • Zero-Knowledge nadzor (bez pristupa podacima klijenata)</div>
         </div>
       </div>
@@ -360,20 +360,48 @@
         <div class="panel-body">
           <div class="form-grid">
             <div class="field full">
+              <label for="lic-type">Tip B2B Licence</label>
+              <select id="lic-type" onchange="onLicenseTypeChange()">
+                <option value="MID_MARKET_ANNUAL">MID_MARKET_ANNUAL (Godišnja licenca • Limiti firmi i operatera)</option>
+                <option value="ENTERPRISE_PERPETUAL_BYO_API">ENTERPRISE_PERPETUAL_BYO_API (Trajna jezgra + Godišnji SLA + BYO-API)</option>
+                <option value="TRIAL_14D">TRIAL_14D (14-dnevna proba vezana za hardver / domen)</option>
+              </select>
+            </div>
+            <div class="field full">
               <label for="lic-agency">Naziv knjigovodstvene agencije / klijenta</label>
               <input id="lic-agency" type="text" placeholder="npr. Alpha Konto Beograd d.o.o." />
             </div>
             <div class="field">
               <label for="lic-pib">PIB (9 cifara)</label>
-              <input id="lic-pib" class="mono" type="text" placeholder="109876543" maxlength="9" />
+              <input id="lic-pib" class="mono" type="text" placeholder="109876543" maxlength="13" />
             </div>
             <div class="field">
               <label for="lic-workers">Maksimalno radnika</label>
               <input id="lic-workers" class="mono" type="number" value="500" min="1" />
             </div>
-            <div class="field full">
-              <label for="lic-exp">Datum isteka licence</label>
+            <div class="field">
+              <label for="lic-max-companies">Max klijentskih firmi (max_client_companies)</label>
+              <input id="lic-max-companies" class="mono" type="number" value="25" min="1" />
+            </div>
+            <div class="field">
+              <label for="lic-max-seats">Max operaterskih mesta (max_operator_seats)</label>
+              <input id="lic-max-seats" class="mono" type="number" value="5" min="1" />
+            </div>
+            <div class="field" id="lic-exp-wrap">
+              <label for="lic-exp">Datum isteka jezgra (core_expiry)</label>
               <input id="lic-exp" class="mono" type="date" />
+            </div>
+            <div class="field" id="lic-sla-wrap">
+              <label for="lic-sla-exp">Istek SLA praćenja zakona (20% godišnji SLA)</label>
+              <input id="lic-sla-exp" class="mono" type="date" />
+            </div>
+            <div class="field" id="lic-fp-wrap" style="display:none;">
+              <label for="lic-bound-fp">Hardverski otisak (opciono za TRIAL_14D)</label>
+              <input id="lic-bound-fp" class="mono" type="text" placeholder="SHA-256 fingerprint stanice" />
+            </div>
+            <div class="field" id="lic-host-wrap" style="display:none;">
+              <label for="lic-bound-host">Vezani domen (opciono za TRIAL_14D)</label>
+              <input id="lic-bound-host" class="mono" type="text" placeholder="npr. app.veles-lab.com" />
             </div>
             <div class="field full">
               <label for="lic-output">Generisani kriptografski ključ</label>
@@ -399,8 +427,8 @@
         </div>
         <div class="panel-body">
           <div class="field">
-            <label for="verify-key-input">Paste license key for signature verification</label>
-            <textarea id="verify-key-input" class="mono" placeholder="Enter AES key (iv:cipher) or RSA-2048 signed token..."></textarea>
+            <label for="verify-key-input">Nalepite licencni ključ za verifikaciju</label>
+            <textarea id="verify-key-input" class="mono" placeholder="Unesite AES ključ (iv:cipher), RSA-2048 token ili Python Base64 ključ..."></textarea>
           </div>
           <div class="btn-row">
             <button class="primary" onclick="verifyKeyInput(document.getElementById('verify-key-input').value)">Proveri Potpis & Rok</button>
@@ -414,8 +442,8 @@
                 <tr>
                   <th>Vreme</th>
                   <th>Agencija</th>
-                  <th>PIB</th>
-                  <th>Ističe</th>
+                  <th>Tip / Limiti</th>
+                  <th>Ističe / SLA</th>
                   <th>Fingerprint</th>
                 </tr>
               </thead>
@@ -432,11 +460,21 @@
     <div class="panel">
       <div class="panel-head">
         <div>
-          <div class="panel-title">3. Monitor Zakonskih Izmena & Paralelni Prikaz Odredbi (Minimalni Resursi)</div>
-          <div class="panel-sub">Uslovni HTTP HEAD nadzor (12h interval) + pure-JS LCS paralelno poređenje izmenjenih članova zakona</div>
+          <div class="panel-title">3. Modularni Country Pack & Monitor Zakonskih Izmena</div>
+          <div class="panel-sub">Uslovni HTTP HEAD nadzor po jurisdikcijama (RS aktivan; HR/SI/ME/DE šabloni) + pure-JS LCS paralelno poređenje odredbi</div>
         </div>
         <div class="btn-row" style="margin-top:0">
+          <select id="lm-country-filter" style="width:auto; min-width:165px;" onchange="fetchLegalMonitor()">
+            <option value="ALL">Sve jurisdikcije</option>
+            <option value="RS" selected>RS — Srbija (Aktivni)</option>
+            <option value="HR">HR — Hrvatska (Šablon)</option>
+            <option value="SI">SI — Slovenija (Šablon)</option>
+            <option value="ME">ME — Crna Gora (Šablon)</option>
+            <option value="DE">DE — Nemačka (Šablon)</option>
+          </select>
+          <span class="tag tag-ok mono" id="lm-pack-badge">Pack: RS (2026.1-RS)</span>
           <span class="tag tag-muted mono" id="lm-rss-badge">RAM: -- MB</span>
+          <button onclick="verifyActiveCountryPack()">Potvrdi HITL Verifikaciju Pack-a</button>
           <button class="primary" id="btn-check-laws" onclick="runLegalHttpCheck()">Pokreni HTTP HEAD Proveru Sada</button>
         </div>
       </div>
@@ -657,8 +695,52 @@
       d.setFullYear(d.getFullYear() + 1);
       const iso = d.toISOString().split("T")[0];
       const expEl = document.getElementById("lic-exp");
+      const slaEl = document.getElementById("lic-sla-exp");
       if (expEl) expEl.value = iso;
+      if (slaEl) slaEl.value = iso;
+      onLicenseTypeChange();
     })();
+
+    function onLicenseTypeChange() {
+      const type = document.getElementById("lic-type").value;
+      const expWrap = document.getElementById("lic-exp-wrap");
+      const slaWrap = document.getElementById("lic-sla-wrap");
+      const fpWrap = document.getElementById("lic-fp-wrap");
+      const hostWrap = document.getElementById("lic-host-wrap");
+      const maxCompEl = document.getElementById("lic-max-companies");
+      const maxSeatsEl = document.getElementById("lic-max-seats");
+      const maxWorkersEl = document.getElementById("lic-workers");
+
+      if (type === "TRIAL_14D") {
+        const d14 = new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0];
+        document.getElementById("lic-exp").value = d14;
+        expWrap.style.display = "flex";
+        slaWrap.style.display = "none";
+        fpWrap.style.display = "flex";
+        hostWrap.style.display = "flex";
+        maxCompEl.value = 3;
+        maxSeatsEl.value = 2;
+        maxWorkersEl.value = 15;
+      } else if (type === "ENTERPRISE_PERPETUAL_BYO_API") {
+        expWrap.style.display = "none";
+        slaWrap.style.display = "flex";
+        fpWrap.style.display = "none";
+        hostWrap.style.display = "none";
+        maxCompEl.value = 9999;
+        maxSeatsEl.value = 999;
+        maxWorkersEl.value = 99999;
+      } else {
+        const d365 = new Date(Date.now() + 365 * 86400000).toISOString().split("T")[0];
+        document.getElementById("lic-exp").value = d365;
+        expWrap.style.display = "flex";
+        slaWrap.style.display = "none";
+        fpWrap.style.display = "none";
+        hostWrap.style.display = "none";
+        maxCompEl.value = 25;
+        maxSeatsEl.value = 5;
+        maxWorkersEl.value = 500;
+      }
+    }
 
     let adminAuthPrompted = false;
 
@@ -731,10 +813,15 @@
           "Uptime: " + (ov.server?.uptimeSec ?? 0) + "s • " + (ov.server?.nodeVersion || "");
 
         const isLicOk = Boolean(lic.valid && lic.success);
-        document.getElementById("kpi-license").textContent = isLicOk ? "ACTIVE" : "TRIAL / UNLICENSED";
-        document.getElementById("kpi-license").style.color = isLicOk ? "#34d399" : "#fbbf24";
+        document.getElementById("kpi-license").textContent = isLicOk
+          ? (lic.licenseType || "ACTIVE")
+          : (lic.readOnlyLock ? "READ-ONLY LOCK" : "TRIAL / UNLICENSED");
+        document.getElementById("kpi-license").style.color = isLicOk
+          ? "#34d399"
+          : (lic.readOnlyLock ? "#f87171" : "#fbbf24");
         document.getElementById("kpi-license-sub").textContent =
-          lic.licenciraniPravniSubjekat || "No active key";
+          (lic.licenciraniPravniSubjekat || "No active key") +
+          (lic.lawTrackerSlaExpiry ? ` • SLA: ${lic.lawTrackerSlaExpiry}` : "");
 
         const aiOk = Boolean(ov.server?.geminiProxyConfigured);
         document.getElementById("kpi-ai").textContent = aiOk ? "SPREMAN" : "NIJE PODEŠEN";
@@ -745,7 +832,7 @@
           ov.legalMonitor?.unreadNotifications ?? 0
         );
         document.getElementById("kpi-legal-laws").textContent =
-          (ov.legalMonitor?.watchedLawsCount ?? 5) + " zakona pod nadzorom";
+          `${ov.legalMonitor?.activeCountryCode || "RS"} • ${(ov.legalMonitor?.watchedLawsCount ?? 5)} zakona pod nadzorom`;
 
         const issuedBody = document.getElementById("issued-licenses-body");
         const list = ov.issuedLicenses || [];
@@ -757,9 +844,9 @@
             .map(
               (item) => `<tr>
                 <td class="mono">${esc((item.issuedAt || "").slice(0, 16).replace("T", " "))}</td>
-                <td>${esc(item.nazivAgencije)}</td>
-                <td class="mono">${esc(item.pibAgencije)}</td>
-                <td class="mono">${esc(item.datumIsteka)}</td>
+                <td>${esc(item.nazivAgencije)}<div class="mono" style="font-size:10px;color:var(--muted)">PIB: ${esc(item.pibAgencije)}</div></td>
+                <td class="mono">${esc(item.licenseType || item.tier || "STANDARD")}<div style="font-size:10px;color:var(--muted)">Firme: ${esc(item.maxClientCompanies ?? "-")} • Sedišta: ${esc(item.maxOperatorSeats ?? "-")}</div></td>
+                <td class="mono">${esc(item.datumIsteka || "PERPETUAL")}${item.lawTrackerSlaExpiry ? `<div style="font-size:10px;color:var(--muted)">SLA: ${esc(item.lawTrackerSlaExpiry)}</div>` : ""}</td>
                 <td class="mono">${esc(item.keyFingerprint || "-")}</td>
               </tr>`
             )
@@ -772,30 +859,51 @@
     }
 
     async function generateLicense() {
+      const licenseType = document.getElementById("lic-type").value;
       const nazivAgencije = document.getElementById("lic-agency").value.trim();
       const pibAgencije = document.getElementById("lic-pib").value.trim();
       const maksimalnoRadnika = Number(document.getElementById("lic-workers").value) || 500;
+      const max_client_companies = Number(document.getElementById("lic-max-companies").value) || 25;
+      const max_operator_seats = Number(document.getElementById("lic-max-seats").value) || 5;
       const datumIsteka = document.getElementById("lic-exp").value;
+      const law_tracker_sla_expiry = document.getElementById("lic-sla-exp").value;
+      const boundFingerprint = document.getElementById("lic-bound-fp").value.trim() || null;
+      const boundHost = document.getElementById("lic-bound-host").value.trim() || null;
 
-      if (!nazivAgencije || !pibAgencije || !datumIsteka) {
-        showNotice("lic-gen-notice", "bad", "Unesite naziv agencije, PIB i datum isteka.");
+      if (!nazivAgencije || !pibAgencije) {
+        showNotice("lic-gen-notice", "bad", "Unesite naziv agencije i PIB.");
+        return;
+      }
+      if (licenseType !== "ENTERPRISE_PERPETUAL_BYO_API" && !datumIsteka) {
+        showNotice("lic-gen-notice", "bad", "Unesite datum isteka licence.");
         return;
       }
       try {
         const res = await adminFetch("/api/license/admin-generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nazivAgencije, pibAgencije, maksimalnoRadnika, datumIsteka }),
+          body: JSON.stringify({
+            licenseType,
+            nazivAgencije,
+            pibAgencije,
+            maksimalnoRadnika,
+            max_client_companies,
+            max_operator_seats,
+            datumIsteka: licenseType === "ENTERPRISE_PERPETUAL_BYO_API" ? null : datumIsteka,
+            law_tracker_sla_expiry: licenseType === "ENTERPRISE_PERPETUAL_BYO_API" ? law_tracker_sla_expiry : datumIsteka,
+            boundFingerprint,
+            boundHost,
+          }),
         });
         const data = await res.json();
-        const key = data.kljucZaKlijenta || data.kljujcZaKlijenta;
+        const key = data.kljucZaKlijenta || data.licenseKey;
         if (data.success && key) {
           document.getElementById("lic-output").value = key;
           document.getElementById("verify-key-input").value = key;
           showNotice(
             "lic-gen-notice",
             "ok",
-            `Ključ uspešno generisan (Fingerprint: <code class="mono">${esc(data.keyFingerprint || "-")}</code>).`
+            `Ključ (${esc(data.licenseType || licenseType)}) uspešno generisan (Fingerprint: <code class="mono">${esc(data.keyFingerprint || "-")}</code>).`
           );
           fetchOverview();
         } else {
@@ -834,10 +942,11 @@
         });
         const data = await res.json();
         if (data.validna && data.podaci) {
+          const d = data.podaci;
           showNotice(
             "lic-verify-notice",
             "ok",
-            `VALIDNA LICENCA: <strong>${esc(data.podaci.nazivAgencije)}</strong> | PIB: <span class="mono">${esc(data.podaci.pibAgencije)}</span> | Ističe: <span class="mono">${esc(data.podaci.datumIsteka)}</span> | Max radnika: ${esc(data.podaci.maksimalnoRadnika)}`
+            `VALIDNA (${esc(d.licenseType || "STANDARD")}): <strong>${esc(d.nazivAgencije)}</strong> | PIB: <span class="mono">${esc(d.pibAgencije)}</span> | Jezgro: <span class="mono">${esc(d.datumIsteka || "PERPETUAL")}</span> | Firme: ${esc(d.max_client_companies ?? "-")} | Operateri: ${esc(d.max_operator_seats ?? "-")}`
           );
         } else {
           showNotice("lic-verify-notice", "bad", esc(data.razlog || "Nevalidan ili oštećen ključ."));
@@ -857,7 +966,7 @@
         const res = await fetch("/api/license/activate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kljucLicence }),
+          body: JSON.stringify({ kljucLicence, eulaAccepted: true }),
         });
         const data = await res.json();
         if (data.success) {
@@ -873,10 +982,21 @@
 
     async function fetchLegalMonitor() {
       try {
-        const res = await fetch("/api/legal-monitor/status");
+        const country = document.getElementById("lm-country-filter")?.value || "RS";
+        const res = await fetch(`/api/legal-monitor/status?country=${encodeURIComponent(country)}`);
         const data = await res.json();
         cachedLaws = data.laws || [];
         cachedNotifications = data.notifications || [];
+
+        const packMeta = data.activePack || {};
+        const lastVerif = packMeta.lastVerifiedByOperator?.verifiedAt
+          ? packMeta.lastVerifiedByOperator.verifiedAt.slice(0, 10)
+          : "Nije verifikovano";
+        const slaNotice = data.lawTrackerSla?.active === false ? " • SLA PAUZIRAN" : "";
+        document.getElementById("lm-pack-badge").textContent =
+          `Pack: ${packMeta.countryCode || "RS"} (${packMeta.taxRulesVersion || "v1"}) • HITL: ${lastVerif}${slaNotice}`;
+        document.getElementById("lm-pack-badge").className =
+          data.lawTrackerSla?.active === false ? "tag tag-warn mono" : "tag tag-ok mono";
 
         document.getElementById("lm-rss-badge").textContent =
           "RAM: " + (data.telemetry?.rssMemoryMb ?? "--") + " MB • Checks: " + (data.telemetry?.checksRun ?? 0);
@@ -897,7 +1017,7 @@
                 ? `<span class="tag tag-warn">${esc(law.lastCheckResult)}</span>`
                 : `<span class="tag tag-muted">${esc(law.lastCheckResult || "baseline")}</span>`;
             return `<tr>
-              <td class="mono"><strong>${esc(law.code)}</strong></td>
+              <td class="mono"><strong>${esc(law.code)}</strong><div style="font-size:10px;color:var(--muted)">${esc(law.countryCode || "RS")}</div></td>
               <td>${esc(law.title)}<div style="font-size:11px; color:var(--muted)">${esc(law.citation)}</div></td>
               <td>${esc(law.baselineClauseTitle)}</td>
               <td class="mono">${checkedStr}</td>
@@ -910,17 +1030,43 @@
         const cmpSelect = document.getElementById("cmp-law-id");
         const prevSelected = cmpSelect.value;
         cmpSelect.innerHTML = cachedLaws
-          .map((l) => `<option value="${esc(l.id)}">${esc(l.code)} — ${esc(l.title)}</option>`)
+          .map((l) => `<option value="${esc(l.id)}">[${esc(l.countryCode || "RS")}] ${esc(l.code)} — ${esc(l.title)}</option>`)
           .join("");
         if (prevSelected && cachedLaws.some((l) => l.id === prevSelected)) {
           cmpSelect.value = prevSelected;
-        } else if (cachedLaws[0] && !document.getElementById("cmp-text").value) {
+        } else if (cachedLaws[0]) {
           loadSelectedBaseline();
         }
 
         renderNotificationsList();
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    async function verifyActiveCountryPack() {
+      const filterVal = document.getElementById("lm-country-filter")?.value || "RS";
+      const countryCode = filterVal === "ALL" ? "RS" : filterVal;
+      const operatorName = window.prompt(
+        `Ime sertifikovanog revizora koji potvrđuje pravila za Country Pack (${countryCode}):`,
+        "Glavni Knjigovođa (HITL Verifikator)"
+      );
+      if (!operatorName) return;
+      try {
+        const res = await adminFetch("/api/legal-monitor/verify-pack", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ countryCode, operatorName }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotice("cmp-notice", "ok", `Country Pack ${esc(countryCode)} HITL verifikovan od strane ${esc(operatorName)}.`);
+          fetchLegalMonitor();
+        } else {
+          showNotice("cmp-notice", "bad", esc(data.error || "Verifikacija nije uspela."));
+        }
+      } catch {
+        showNotice("cmp-notice", "bad", "Greška pri komunikaciji sa serverom.");
       }
     }
 

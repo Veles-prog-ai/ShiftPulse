@@ -1,4 +1,4 @@
-# ShiftPulse Ledger Pro — Commercial API, Billing & Unit Economics Plan (v1.0 RS)
+# ShiftPulse Ledger — Commercial API, Billing & Unit Economics Plan (v1.0 RS)
 
 ## 1. Launch Market Scope & Regulatory Jurisdiction
 - **Initial Commercial Release (v1.0)**: **Republic of Serbia (`RS`)** only.

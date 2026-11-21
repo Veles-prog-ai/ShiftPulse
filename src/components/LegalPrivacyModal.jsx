@@ -55,7 +55,7 @@ export const LegalPrivacyModal = ({ onClose, initialTab = "privacy" }) => {
   };
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
@@ -207,6 +207,33 @@ export const LegalPrivacyModal = ({ onClose, initialTab = "privacy" }) => {
                   ))}
                 </div>
               </div>
+
+              {s.p6Title && (
+                <div className="p-4 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/70 space-y-2.5">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    {s.p6Title}
+                  </h4>
+                  <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {s.p6Body}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(s.p6Fields || []).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800/60 text-xs"
+                      >
+                        <code className="font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          {item.field}
+                        </code>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {item.desc}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -250,6 +277,22 @@ export const LegalPrivacyModal = ({ onClose, initialTab = "privacy" }) => {
                   </p>
                 </div>
               </div>
+
+              {s.t4Title && (
+                <div className="p-4 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/60 flex items-start gap-3">
+                  <Lock className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                      {s.t4Title}
+                    </h4>
+                    <ul className="list-disc list-inside mt-2 text-xs text-slate-700 dark:text-slate-300 space-y-1.5 pl-1 leading-relaxed">
+                      {(s.t4Bullets || []).map((b, i) => (
+                        <li key={i}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

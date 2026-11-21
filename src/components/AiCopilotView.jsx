@@ -35,9 +35,33 @@ export const AiCopilotView = () => {
     activeOperator,
     recordAiUsageStats,
     logHitlDecision,
+    license,
+    byoApiConfig,
   } = useShift();
   const { t } = useLanguage();
   const h = t.ui.aiCopilotHitl;
+
+  const buildAiHeaders = () => {
+    const headers = { "Content-Type": "application/json" };
+    try {
+      const savedKey = localStorage.getItem("shiftpulse_license_key_v1");
+      if (savedKey) {
+        headers["x-license-key"] = savedKey;
+      }
+    } catch {
+      // ignore storage access issues
+    }
+    if (license?.byoApiAllowed && byoApiConfig?.enabled && byoApiConfig?.apiKey) {
+      headers["x-byo-ai-key"] = byoApiConfig.apiKey;
+      if (byoApiConfig.endpoint) {
+        headers["x-byo-ai-endpoint"] = byoApiConfig.endpoint;
+      }
+      if (byoApiConfig.model) {
+        headers["x-byo-ai-model"] = byoApiConfig.model;
+      }
+    }
+    return headers;
+  };
 
   const [loadingDoc, setLoadingDoc] = useState(false);
   const [docResult, setDocResult] = useState(null);
@@ -123,7 +147,7 @@ export const AiCopilotView = () => {
 
         const response = await fetch("/api/legal/analyze-document", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: buildAiHeaders(),
           body: JSON.stringify({
             extractedTextSnippet: rawText.slice(0, 8000),
             mimeType: file.type || "text/plain",
@@ -169,7 +193,7 @@ export const AiCopilotView = () => {
 
       const response = await fetch("/api/legal/analyze-document", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAiHeaders(),
         body: JSON.stringify({
           base64Data: base64String,
           mimeType: file.type || "application/pdf",
@@ -231,7 +255,8 @@ export const AiCopilotView = () => {
       },
     };
 
-    addJobFromAi(finalPayload);
+    const createdJob = addJobFromAi(finalPayload);
+    if (!createdJob) return;
 
     const finalDecision = wasEdited ? "edited_approved" : "approved";
     await logHitlDecision({
@@ -314,7 +339,7 @@ export const AiCopilotView = () => {
       // 3. Tek ako je poruka nejasna ili zahteva kompleksan kontekst, pozivamo optimizovani Gemini-4-Hydrogen
       const response = await fetch("/api/schedule/detect-conflicts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildAiHeaders(),
         body: JSON.stringify({
           incomingMessage: sanitizedMsg,
           compactScheduleSummary: compactSchedule,

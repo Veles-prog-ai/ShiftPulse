@@ -2,7 +2,7 @@
   "id": "example-export-extension",
   "name": "Audit Snapshot & Export Extension",
   "version": "1.0.0",
-  "description": "Demonstrates the ShiftPulse modular plugin system by adding an Audit Snapshot action button, ledger/export hooks, a sidebar widget, and a custom inspection route.",
+  "description": "Demonstrates the ShiftPulse Ledger modular plugin system by adding an Audit Snapshot action button, ledger/export hooks, a sidebar widget, and a custom inspection route.",
   "requiredLicenseTier": "Trial",
   "entryPoint": "index.js",
   "backendEntry": "backend.js",

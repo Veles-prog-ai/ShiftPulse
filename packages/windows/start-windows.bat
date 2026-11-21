@@ -1,12 +1,12 @@
 @echo off
-title ShiftPulse Ledger Pro - Pokretanje
+title ShiftPulse Ledger - Pokretanje
 color 0a
 
 set SCRIPT_DIR=%~dp0
 cd /d "%SCRIPT_DIR%"
 
 echo ======================================================================
-echo          ShiftPulse Ledger Pro - Desktop Workstation (Windows)
+echo          ShiftPulse Ledger - Desktop Workstation (Windows)
 echo ======================================================================
 echo.
 echo [INFO] Pokrecem lokalni server na portu 3000...

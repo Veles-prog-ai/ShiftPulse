@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ======================================================================
-# ShiftPulse Ledger Pro - ChromeOS Linux Environment (Crostini) Installer
+# ShiftPulse Ledger - ChromeOS Linux Environment (Crostini) Installer
 # Za Chromebook računare sa aktiviranim Linux razvojnim okruženjem
 # ======================================================================
 
@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DESKTOP_DIR="${HOME}/.local/share/applications"
 
 echo -e "\033[1;36m======================================================================\033[0m"
-echo -e "\033[1;36m       ShiftPulse Ledger Pro - ChromeOS Crostini Installer            \033[0m"
+echo -e "\033[1;36m       ShiftPulse Ledger - ChromeOS Crostini Installer            \033[0m"
 echo -e "\033[1;36m======================================================================\033[0m"
 echo ""
 
@@ -29,7 +29,7 @@ cat <<EOF > "${DESKTOP_DIR}/shiftpulse-chromeos.desktop"
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=ShiftPulse Ledger Pro (ChromeOS)
+Name=ShiftPulse Ledger (ChromeOS)
 Comment=Zero-Knowledge Accounting, Payroll & Tax Workstation
 Exec=env NODE_ENV=production PORT=3000 SHIFTPULSE_LOCAL_DESKTOP=1 SHIFTPULSE_WORKSPACE_DIR=${HOME}/ShiftPulse_Workspace node "${SCRIPT_DIR}/server.js"
 Icon=${SCRIPT_DIR}/public/icon.svg

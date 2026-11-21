@@ -1,8 +1,8 @@
 @echo off
-title ShiftPulse Ledger Pro - Commercial Workstation Installer (v1.0 RS)
+title ShiftPulse Ledger - Commercial Workstation Installer (v1.0 RS)
 color 0b
 echo ======================================================================
-echo       ShiftPulse Ledger Pro - Commercial B2B Workstation Setup
+echo       ShiftPulse Ledger - Commercial B2B Workstation Setup
 echo            Republic of Serbia v1.0 Edition (Windows 10/11)
 echo ======================================================================
 echo.
@@ -50,15 +50,15 @@ mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Zarade_ePorezi_XML" 2>nul
 mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Virmani_Nalozi" 2>nul
 mkdir "%WS_DIR%\02_Izlaz_Dokumenta\Arhiva_Ugovori" 2>nul
 mkdir "%WS_DIR%\03_Korisnicki_Backup" 2>nul
-echo ShiftPulse Workspace: %WS_DIR%
+echo ShiftPulse Ledger Workspace: %WS_DIR%
 
 :: 4. Kreiranje precice na radnoj povrsini (Desktop Shortcut)
 echo [4/4] Kreiranje precice za radnu povrsinu...
 set SCRIPT_DIR=%~dp0
 set TARGET_SCRIPT=%SCRIPT_DIR%start-windows.bat
-set SHORTCUT_PATH=%USERPROFILE%\Desktop\ShiftPulse Ledger Pro.lnk
+set SHORTCUT_PATH=%USERPROFILE%\Desktop\ShiftPulse Ledger.lnk
 
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT_PATH%'); $s.TargetPath = '%TARGET_SCRIPT%'; $s.WorkingDirectory = '%SCRIPT_DIR%'; $s.IconLocation = '%SCRIPT_DIR%public\icon.svg'; $s.Description = 'ShiftPulse Ledger Pro - Knjigovodstvo i Smenski Rad'; $s.Save()"
+powershell -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%SHORTCUT_PATH%'); $s.TargetPath = '%TARGET_SCRIPT%'; $s.WorkingDirectory = '%SCRIPT_DIR%'; $s.IconLocation = '%SCRIPT_DIR%public\icon.svg'; $s.Description = 'ShiftPulse Ledger - Knjigovodstvo i Smenski Rad'; $s.Save()"
 
 if exist "%SHORTCUT_PATH%" (
     echo [USPEH] Precica je uspesno kreirana na vasem Desktopu!

@@ -83,7 +83,7 @@ app.use((req, res, next) => {
     );
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, x-admin-secret, x-license-key",
+      "Content-Type, Authorization, x-admin-secret, x-license-key, x-byo-ai-endpoint, x-byo-ai-key, x-byo-ai-model",
     );
   }
   if (req.method === "OPTIONS") {
@@ -130,7 +130,7 @@ function requireAdminAuth(req, res, next) {
 
   if (!configuredSecret) {
     if (!isApiRequest) {
-      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Admin Console", charset="UTF-8"');
+      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Ledger Admin Console", charset="UTF-8"');
       return res
         .status(401)
         .send("Unauthorized: ADMIN_SECRET_KEY is not configured on the server.");
@@ -144,7 +144,7 @@ function requireAdminAuth(req, res, next) {
   const providedSecret = extractAdminSecretFromRequest(req);
   if (!timingSafeEqualString(providedSecret, configuredSecret)) {
     if (!isApiRequest) {
-      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Admin Console", charset="UTF-8"');
+      res.setHeader("WWW-Authenticate", 'Basic realm="ShiftPulse Ledger Admin Console", charset="UTF-8"');
       return res
         .status(401)
         .send("Unauthorized: Valid admin credentials are required.");
@@ -169,8 +169,153 @@ const MASTER_ENCRYPTION_KEY =
   "359b8c642f883f3e8f85f1c2b5e913a47d2b8e3a5f6c8d7b1a2c3d4e5f6a7b8c";
 const ENCRYPTION_ALGORITHM = "aes-256-cbc";
 
+const ACTIVE_LICENSE_FILE = path.join(__dirname, ".active_license.key");
+const TRIAL_HARDWARE_SALT =
+  process.env.TRIAL_HARDWARE_SALT || MASTER_ENCRYPTION_KEY;
+const PYTHON_LICENSE_SECRET =
+  process.env.SHIFTPULSE_PY_LICENSE_SECRET || "ShiftPulse2026Secret";
+
+function computeWorkstationFingerprint() {
+  try {
+    const netIfs = os.networkInterfaces();
+    const macs = [];
+    for (const ifList of Object.values(netIfs)) {
+      for (const iface of ifList || []) {
+        if (!iface.internal && iface.mac && iface.mac !== "00:00:00:00:00:00") {
+          macs.push(iface.mac);
+        }
+      }
+    }
+    const raw = [
+      os.hostname(),
+      os.platform(),
+      os.arch(),
+      macs.sort().join(","),
+      TRIAL_HARDWARE_SALT,
+    ].join("|");
+    return crypto.createHash("sha256").update(raw).digest("hex").slice(0, 24);
+  } catch {
+    return crypto
+      .createHash("sha256")
+      .update(`${os.hostname()}|${TRIAL_HARDWARE_SALT}`)
+      .digest("hex")
+      .slice(0, 24);
+  }
+}
+
+function addDaysIso(days) {
+  return new Date(Date.now() + Number(days) * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+function isIsoDateExpired(isoDateStr) {
+  if (!isoDateStr || String(isoDateStr).toUpperCase() === "PERPETUAL") {
+    return false;
+  }
+  const normalized = String(isoDateStr).trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false;
+  const expirationDate = new Date(`${normalized}T23:59:59.999Z`);
+  return Date.now() > expirationDate.getTime();
+}
+
+function normalizeLicenseType(licenseType, tier) {
+  const raw = String(licenseType || "").trim().toUpperCase();
+  if (
+    raw === "TRIAL_14D" ||
+    raw === "MID_MARKET_ANNUAL" ||
+    raw === "ENTERPRISE_PERPETUAL_BYO_API"
+  ) {
+    return raw;
+  }
+  const tierLower = String(tier || "").trim().toLowerCase();
+  if (
+    tierLower.includes("enterprise") ||
+    tierLower.includes("perpetual") ||
+    tierLower.includes("byo")
+  ) {
+    return "ENTERPRISE_PERPETUAL_BYO_API";
+  }
+  if (tierLower.includes("trial")) {
+    return "TRIAL_14D";
+  }
+  return "MID_MARKET_ANNUAL";
+}
+
 function generateB2BLicense(payloadData) {
-  const plaintext = JSON.stringify(payloadData);
+  const resolvedType = normalizeLicenseType(
+    payloadData.licenseType,
+    payloadData.tier,
+  );
+  const nowIso = new Date().toISOString();
+
+  let datumIsteka = payloadData.datumIsteka
+    ? String(payloadData.datumIsteka).trim()
+    : null;
+  let coreExpiry = payloadData.core_expiry ?? datumIsteka;
+  let lawTrackerSlaExpiry = payloadData.law_tracker_sla_expiry
+    ? String(payloadData.law_tracker_sla_expiry).trim()
+    : null;
+  let maxClientCompanies = Number(payloadData.max_client_companies) || 25;
+  let maxOperatorSeats = Number(payloadData.max_operator_seats) || 5;
+  let maksimalnoRadnika = Number(payloadData.maksimalnoRadnika) || 500;
+  let tierLabel = payloadData.tier || "";
+  let features = Array.isArray(payloadData.features)
+    ? payloadData.features
+    : [
+        "ai_scanner",
+        "conflict_monitor",
+        "b2b_shift_management",
+        "eporezi_xml",
+        "country_packs",
+      ];
+
+  if (resolvedType === "TRIAL_14D") {
+    datumIsteka = datumIsteka || addDaysIso(14);
+    coreExpiry = datumIsteka;
+    lawTrackerSlaExpiry = lawTrackerSlaExpiry || datumIsteka;
+    maxClientCompanies = Number(payloadData.max_client_companies) || 3;
+    maxOperatorSeats = Number(payloadData.max_operator_seats) || 2;
+    maksimalnoRadnika = Number(payloadData.maksimalnoRadnika) || 15;
+    tierLabel = tierLabel || "Trial 14D";
+  } else if (resolvedType === "ENTERPRISE_PERPETUAL_BYO_API") {
+    datumIsteka = null;
+    coreExpiry = null;
+    lawTrackerSlaExpiry = lawTrackerSlaExpiry || addDaysIso(365);
+    maxClientCompanies = Number(payloadData.max_client_companies) || 9999;
+    maxOperatorSeats = Number(payloadData.max_operator_seats) || 999;
+    maksimalnoRadnika = Number(payloadData.maksimalnoRadnika) || 99999;
+    tierLabel = tierLabel || "Enterprise Perpetual BYO-API";
+    if (!features.includes("byo_api")) features = [...features, "byo_api"];
+  } else {
+    datumIsteka = datumIsteka || addDaysIso(365);
+    coreExpiry = datumIsteka;
+    lawTrackerSlaExpiry = lawTrackerSlaExpiry || datumIsteka;
+    tierLabel = tierLabel || "Mid-Market Annual";
+  }
+
+  const normalizedPayload = {
+    licenseId:
+      payloadData.licenseId ||
+      `SPL-${resolvedType === "TRIAL_14D" ? "TRL" : resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" ? "ENT" : "MID"}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`,
+    licenseType: resolvedType,
+    pibAgencije: String(payloadData.pibAgencije || "000000000").trim(),
+    nazivAgencije: String(payloadData.nazivAgencije || "Licensed Entity").trim(),
+    maksimalnoRadnika,
+    max_client_companies: maxClientCompanies,
+    max_operator_seats: maxOperatorSeats,
+    issuedAt: payloadData.issuedAt || nowIso,
+    datumIsteka,
+    core_expiry: coreExpiry,
+    law_tracker_sla_expiry: lawTrackerSlaExpiry,
+    byo_api_allowed: resolvedType === "ENTERPRISE_PERPETUAL_BYO_API",
+    boundFingerprint: payloadData.boundFingerprint || null,
+    boundHost: payloadData.boundHost || null,
+    tier: tierLabel,
+    features,
+  };
+
+  const plaintext = JSON.stringify(normalizedPayload);
   const iv = crypto.randomBytes(16);
   const keyBuffer = crypto.scryptSync(MASTER_ENCRYPTION_KEY, "salt", 32);
   const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, keyBuffer, iv);
@@ -194,14 +339,19 @@ export function validatePromoLicense(licenseKeyBase64) {
     const buffer = Buffer.from(licenseKeyBase64.trim(), "base64");
     const decrypted = crypto.publicDecrypt(RSA_PUBLIC_KEY, buffer);
     const payload = JSON.parse(decrypted.toString("utf-8"));
-    if (!payload.expiresAt) {
+    const resolvedType = normalizeLicenseType(payload.licenseType, payload.tier);
+    const isPerpetual =
+      resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" &&
+      (payload.core_expiry === null || !payload.expiresAt);
+
+    if (!isPerpetual && !payload.expiresAt) {
       return { isValid: false, reason: "Invalid license payload format." };
     }
-    const currentDate = new Date();
-    const expirationDate = new Date(`${payload.expiresAt}T23:59:59`);
-    if (currentDate > expirationDate) {
+    if (!isPerpetual && isIsoDateExpired(payload.expiresAt)) {
       return {
         isValid: false,
+        expired: true,
+        payload,
         reason: "Cryptographic license lease has expired.",
       };
     }
@@ -332,7 +482,164 @@ export async function verifySystemTimeIntegrity(dbClient) {
   }
 }
 
-function validateLocalLicense(licenseKey) {
+function decodePythonSignedLicense(cleanedKey, requestHost = "") {
+  try {
+    const decoded = Buffer.from(cleanedKey, "base64").toString("utf8");
+    const sepIdx = decoded.lastIndexOf("::");
+    if (sepIdx <= 0) return null;
+    const payloadJson = decoded.slice(0, sepIdx);
+    const providedSig = decoded.slice(sepIdx + 2);
+    const expectedSig = crypto
+      .createHash("sha256")
+      .update(`${payloadJson}:${PYTHON_LICENSE_SECRET}`)
+      .digest("hex")
+      .slice(0, providedSig.length);
+
+    if (!timingSafeEqualString(providedSig, expectedSig)) {
+      return {
+        validna: false,
+        podaci: null,
+        razlog: "Python license token signature mismatch.",
+      };
+    }
+    const parsed = JSON.parse(payloadJson);
+    const evaluated = evaluateDecryptedLicensePayload(parsed, requestHost);
+    return evaluated;
+  } catch {
+    return null;
+  }
+}
+
+function evaluateDecryptedLicensePayload(rawPayload, requestHost = "") {
+  const resolvedType = normalizeLicenseType(
+    rawPayload.licenseType,
+    rawPayload.tier,
+  );
+  const isPerpetualCore =
+    resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" &&
+    (rawPayload.core_expiry === null ||
+      rawPayload.datumIsteka === null ||
+      String(rawPayload.datumIsteka || "").toUpperCase() === "PERPETUAL");
+
+  const coreExpiryDate = isPerpetualCore
+    ? null
+    : rawPayload.core_expiry || rawPayload.datumIsteka || rawPayload.expiresAt || null;
+
+  const lawTrackerSlaExpiry =
+    rawPayload.law_tracker_sla_expiry ||
+    (resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" ? null : coreExpiryDate);
+
+  const normalizedData = {
+    licenseId: rawPayload.licenseId || "SPL-LOCAL",
+    licenseType: resolvedType,
+    nazivAgencije:
+      rawPayload.nazivAgencije || rawPayload.name || rawPayload.clientName || "Licensed Entity",
+    pibAgencije: String(rawPayload.pibAgencije || rawPayload.pib || "N/A"),
+    tier:
+      rawPayload.tier ||
+      (resolvedType === "ENTERPRISE_PERPETUAL_BYO_API"
+        ? "Enterprise Perpetual BYO-API"
+        : resolvedType === "TRIAL_14D"
+          ? "Trial 14D"
+          : "Mid-Market Annual"),
+    issuedAt: rawPayload.issuedAt || null,
+    datumIsteka: coreExpiryDate,
+    core_expiry: coreExpiryDate,
+    law_tracker_sla_expiry: lawTrackerSlaExpiry,
+    maksimalnoRadnika: Number(rawPayload.maksimalnoRadnika) || 500,
+    max_client_companies:
+      Number(rawPayload.max_client_companies) ||
+      (resolvedType === "ENTERPRISE_PERPETUAL_BYO_API"
+        ? 9999
+        : resolvedType === "TRIAL_14D"
+          ? 3
+          : 25),
+    max_operator_seats:
+      Number(rawPayload.max_operator_seats) ||
+      (resolvedType === "ENTERPRISE_PERPETUAL_BYO_API"
+        ? 999
+        : resolvedType === "TRIAL_14D"
+          ? 2
+          : 5),
+    byo_api_allowed:
+      resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" ||
+      Boolean(rawPayload.byo_api_allowed),
+    boundFingerprint: rawPayload.boundFingerprint || null,
+    boundHost: rawPayload.boundHost || null,
+    features: rawPayload.features || [
+      "ai_scanner",
+      "conflict_monitor",
+      "b2b_shift_management",
+      "eporezi_xml",
+      ...(resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" ? ["byo_api"] : []),
+    ],
+  };
+
+  if (resolvedType === "TRIAL_14D") {
+    const localFp = computeWorkstationFingerprint();
+    if (
+      normalizedData.boundFingerprint &&
+      normalizedData.boundFingerprint !== localFp
+    ) {
+      return {
+        validna: false,
+        expired: false,
+        readOnlyLock: true,
+        podaci: normalizedData,
+        razlog:
+          "14-day evaluation license is bound to a different workstation hardware fingerprint.",
+      };
+    }
+    const cleanHost = String(requestHost || "").split(":")[0].toLowerCase();
+    const cleanBoundHost = String(normalizedData.boundHost || "")
+      .split(":")[0]
+      .toLowerCase();
+    if (
+      cleanBoundHost &&
+      cleanHost &&
+      cleanBoundHost !== cleanHost &&
+      cleanHost !== "localhost" &&
+      cleanHost !== "127.0.0.1"
+    ) {
+      return {
+        validna: false,
+        expired: false,
+        readOnlyLock: true,
+        podaci: normalizedData,
+        razlog: `14-day evaluation license is bound to domain "${normalizedData.boundHost}".`,
+      };
+    }
+  }
+
+  if (!isPerpetualCore && coreExpiryDate && isIsoDateExpired(coreExpiryDate)) {
+    return {
+      validna: false,
+      expired: true,
+      readOnlyLock: resolvedType === "TRIAL_14D",
+      podaci: normalizedData,
+      razlog:
+        resolvedType === "TRIAL_14D"
+          ? `14-day evaluation expired on ${coreExpiryDate}. Read-only lock active: local data remains readable, write/export actions are locked.`
+          : `License expired on ${coreExpiryDate}.`,
+    };
+  }
+
+  const lawTrackerSlaExpired = lawTrackerSlaExpiry
+    ? isIsoDateExpired(lawTrackerSlaExpiry)
+    : false;
+
+  return {
+    validna: true,
+    expired: false,
+    readOnlyLock: false,
+    corePerpetual: isPerpetualCore,
+    lawTrackerSlaActive: !lawTrackerSlaExpired,
+    lawTrackerSlaExpired,
+    podaci: normalizedData,
+  };
+}
+
+function validateLocalLicense(licenseKey, requestHost = "") {
   if (!licenseKey) {
     return {
       validna: false,
@@ -341,24 +648,30 @@ function validateLocalLicense(licenseKey) {
     };
   }
   const cleaned = licenseKey.trim();
+
+  // Check Python-generated base64(json::sig) format first if decodable
+  if (!cleaned.includes(":") && cleaned.length > 24) {
+    const pyCheck = decodePythonSignedLicense(cleaned, requestHost);
+    if (pyCheck) {
+      return pyCheck;
+    }
+  }
+
   if (!cleaned.includes(":") && cleaned.length > 80) {
     const rsaCheck = validatePromoLicense(cleaned);
     if (rsaCheck.isValid && rsaCheck.payload) {
-      return {
-        validna: true,
-        podaci: {
-          licenseId: rsaCheck.payload.licenseId,
-          nazivAgencije: rsaCheck.payload.clientName,
-          pibAgencije: rsaCheck.payload.pibAgencije || "N/A",
-          tier: rsaCheck.payload.tier,
-          issuedAt: rsaCheck.payload.issuedAt,
-          datumIsteka: rsaCheck.payload.expiresAt,
-          maksimalnoRadnika: Number(rsaCheck.payload.maksimalnoRadnika) || 5000,
-          features: rsaCheck.payload.features,
-        },
-      };
+      return evaluateDecryptedLicensePayload(rsaCheck.payload, requestHost);
     }
-    return { validna: false, podaci: null, razlog: rsaCheck.reason };
+    return {
+      validna: false,
+      expired: Boolean(rsaCheck.expired),
+      readOnlyLock: Boolean(
+        rsaCheck.expired &&
+          normalizeLicenseType(rsaCheck.payload?.licenseType, rsaCheck.payload?.tier) === "TRIAL_14D",
+      ),
+      podaci: rsaCheck.payload || null,
+      razlog: rsaCheck.reason,
+    };
   }
 
   if (!cleaned.includes(":")) {
@@ -377,16 +690,7 @@ function validateLocalLicense(licenseKey) {
     let decryptedText = decipher.update(encryptedHex, "hex", "utf8");
     decryptedText += decipher.final("utf8");
     const licenseData = JSON.parse(decryptedText);
-    const today = new Date();
-    const expirationDate = new Date(`${licenseData.datumIsteka}T23:59:59`);
-    if (today > expirationDate) {
-      return {
-        validna: false,
-        podaci: licenseData,
-        razlog: `License expired on ${licenseData.datumIsteka}.`,
-      };
-    }
-    return { validna: true, podaci: licenseData };
+    return evaluateDecryptedLicensePayload(licenseData, requestHost);
   } catch {
     return {
       validna: false,
@@ -396,7 +700,31 @@ function validateLocalLicense(licenseKey) {
   }
 }
 
-let activeClientLicenseKey = process.env.B2B_LICENSE_KEY || "";
+function loadPersistedActiveLicenseKey() {
+  if (process.env.B2B_LICENSE_KEY) {
+    return String(process.env.B2B_LICENSE_KEY).trim();
+  }
+  try {
+    if (fs.existsSync(ACTIVE_LICENSE_FILE)) {
+      return fs.readFileSync(ACTIVE_LICENSE_FILE, "utf8").trim();
+    }
+  } catch {
+    // Ignore read failures on read-only filesystem
+  }
+  return "";
+}
+
+function persistActiveLicenseKey(keyStr) {
+  try {
+    if (keyStr) {
+      fs.writeFileSync(ACTIVE_LICENSE_FILE, String(keyStr).trim(), "utf8");
+    }
+  } catch {
+    // Ignore write failures
+  }
+}
+
+let activeClientLicenseKey = loadPersistedActiveLicenseKey();
 const ISSUED_LICENSES_AUDIT_FILE = path.join(__dirname, "issued_licenses_audit.jsonl");
 
 function appendIssuedLicenseAudit(entry) {
@@ -430,17 +758,21 @@ function readIssuedLicenseAudit(limit = 30) {
   }
 }
 
-async function resolveLicenseStatusSnapshot(customKeyOverride = "") {
+async function resolveLicenseStatusSnapshot(customKeyOverride = "", requestHost = "") {
   const timeCheck = await verifySystemTimeIntegrity();
   const keyToCheck =
     customKeyOverride || activeClientLicenseKey || process.env.B2B_LICENSE_KEY;
+  const workstationFingerprint = computeWorkstationFingerprint();
 
   if (!timeCheck.isTimeValid) {
     return {
       success: false,
       valid: false,
       trial: false,
+      readOnlyLock: true,
+      licenseType: "LOCKED",
       tier: "Locked",
+      workstationFingerprint,
       antiClockTampering: {
         isTimeValid: false,
         reason: timeCheck.reason,
@@ -448,6 +780,9 @@ async function resolveLicenseStatusSnapshot(customKeyOverride = "") {
       },
       licenciraniPravniSubjekat: "SYSTEM LOCKED",
       datumIsteka: "BLOCKED",
+      lawTrackerSlaActive: false,
+      lawTrackerSlaExpired: true,
+      byoApiAllowed: false,
       poruka: timeCheck.reason,
     };
   }
@@ -457,33 +792,60 @@ async function resolveLicenseStatusSnapshot(customKeyOverride = "") {
       success: false,
       valid: false,
       trial: true,
-      tier: "Trial",
+      expired: false,
+      readOnlyLock: false,
+      licenseType: "UNLICENSED_SANDBOX",
+      tier: "Sandbox Preview",
+      workstationFingerprint,
       antiClockTampering: {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      licenciraniPravniSubjekat: "Unlicensed Workstation (Trial)",
+      licenciraniPravniSubjekat: "Unlicensed Workstation (Accept EULA for 14-Day Trial)",
       datumIsteka: "TRIAL",
+      core_expiry: null,
+      lawTrackerSlaExpiry: null,
+      lawTrackerSlaActive: true,
+      lawTrackerSlaExpired: false,
+      byoApiAllowed: false,
       maksimalnoRadnika: 3,
+      maxClientCompanies: 3,
+      maxOperatorSeats: 2,
       poruka:
-        "Workstation running in unlicensed trial mode (up to 3 workers). ePorezi XML export requires an active commercial license.",
+        "Workstation running in unlicensed preview mode (up to 3 workers). Accept EULA to start your 14-day trial or activate a commercial license.",
     };
   }
 
-  const check = validateLocalLicense(keyToCheck);
+  const check = validateLocalLicense(keyToCheck, requestHost);
   if (check.validna && check.podaci) {
+    const p = check.podaci;
+    const isTrial = p.licenseType === "TRIAL_14D";
     return {
       success: true,
       valid: true,
-      trial: false,
-      licenseId: check.podaci.licenseId,
-      licenciraniPravniSubjekat: check.podaci.nazivAgencije,
-      pibAgencije: check.podaci.pibAgencije,
-      tier: check.podaci.tier || "Enterprise / Full Content",
-      issuedAt: check.podaci.issuedAt,
-      datumIsteka: check.podaci.datumIsteka,
-      maksimalnoRadnika: check.podaci.maksimalnoRadnika,
-      features: check.podaci.features || [
+      trial: isTrial,
+      expired: false,
+      readOnlyLock: false,
+      corePerpetual: Boolean(check.corePerpetual),
+      licenseId: p.licenseId,
+      licenseType: p.licenseType,
+      licenciraniPravniSubjekat: p.nazivAgencije,
+      pibAgencije: p.pibAgencije,
+      tier: p.tier || "Mid-Market Annual",
+      issuedAt: p.issuedAt,
+      datumIsteka: p.datumIsteka || "PERPETUAL",
+      coreExpiry: p.core_expiry,
+      lawTrackerSlaExpiry: p.law_tracker_sla_expiry,
+      lawTrackerSlaActive: check.lawTrackerSlaActive !== false,
+      lawTrackerSlaExpired: Boolean(check.lawTrackerSlaExpired),
+      byoApiAllowed: Boolean(p.byo_api_allowed),
+      boundFingerprint: p.boundFingerprint || null,
+      boundHost: p.boundHost || null,
+      workstationFingerprint,
+      maksimalnoRadnika: p.maksimalnoRadnika,
+      maxClientCompanies: p.max_client_companies,
+      maxOperatorSeats: p.max_operator_seats,
+      features: p.features || [
         "ai_scanner",
         "conflict_monitor",
         "b2b_shift_management",
@@ -493,21 +855,39 @@ async function resolveLicenseStatusSnapshot(customKeyOverride = "") {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
       },
-      poruka: `Station authorized and licensed (${check.podaci.tier || "Enterprise"}).`,
+      poruka:
+        p.licenseType === "ENTERPRISE_PERPETUAL_BYO_API" && check.lawTrackerSlaExpired
+          ? "Enterprise Perpetual Core active. Annual Law Tracker SLA expired — live regulatory monitoring is paused until SLA renewal."
+          : `Station authorized and licensed (${p.licenseType}).`,
     };
   }
 
+  const p = check.podaci || {};
+  const isExpiredTrial = p.licenseType === "TRIAL_14D" && Boolean(check.readOnlyLock);
   return {
     success: false,
     valid: false,
-    trial: true,
-    tier: "Trial",
+    trial: p.licenseType === "TRIAL_14D",
+    expired: Boolean(check.expired),
+    readOnlyLock: Boolean(check.readOnlyLock || isExpiredTrial),
+    licenseType: p.licenseType || "EXPIRED",
+    tier: p.tier || "Expired",
+    licenciraniPravniSubjekat: p.nazivAgencije || "Unlicensed Workstation",
+    pibAgencije: p.pibAgencije || "N/A",
+    datumIsteka: p.datumIsteka || "EXPIRED",
+    coreExpiry: p.core_expiry || p.datumIsteka || null,
+    lawTrackerSlaExpiry: p.law_tracker_sla_expiry || null,
+    lawTrackerSlaActive: false,
+    lawTrackerSlaExpired: true,
+    byoApiAllowed: false,
+    maxClientCompanies: p.max_client_companies || 3,
+    maxOperatorSeats: p.max_operator_seats || 2,
+    maksimalnoRadnika: p.maksimalnoRadnika || 3,
+    workstationFingerprint,
     antiClockTampering: {
       isTimeValid: true,
       lastRecorded: timeCheck.lastRecorded,
     },
-    licenciraniPravniSubjekat: "Unlicensed Workstation",
-    datumIsteka: "EXPIRED",
     poruka: check.razlog || "License key is missing, invalid, or expired.",
   };
 }
@@ -523,21 +903,48 @@ const pluginManager = new BackendPluginManager({
 
 app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
   try {
-    const { pibAgencije, nazivAgencije, maksimalnoRadnika, datumIsteka, tier } =
-      req.body || {};
-    if (!pibAgencije || !nazivAgencije || !datumIsteka) {
+    const {
+      pibAgencije,
+      nazivAgencije,
+      licenseType,
+      maksimalnoRadnika,
+      max_client_companies,
+      max_operator_seats,
+      datumIsteka,
+      law_tracker_sla_expiry,
+      boundFingerprint,
+      boundHost,
+      tier,
+    } = req.body || {};
+    const resolvedType = normalizeLicenseType(licenseType, tier);
+
+    if (!pibAgencije || !nazivAgencije) {
       res.status(400).json({
-        error: "Missing required fields for license generation (PIB, company name, expiration date).",
+        error: "Missing required fields for license generation (PIB and company name).",
       });
       return;
     }
+    if (resolvedType !== "ENTERPRISE_PERPETUAL_BYO_API" && !datumIsteka && resolvedType !== "TRIAL_14D") {
+      res.status(400).json({
+        error: "Expiration date is required for non-perpetual license tiers.",
+      });
+      return;
+    }
+
     const generatedKey = generateB2BLicense({
       pibAgencije: String(pibAgencije),
       nazivAgencije: String(nazivAgencije),
-      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
-      datumIsteka: String(datumIsteka),
-      tier: tier ? String(tier) : "Enterprise",
+      licenseType: resolvedType,
+      maksimalnoRadnika: Number(maksimalnoRadnika) || undefined,
+      max_client_companies: Number(max_client_companies) || undefined,
+      max_operator_seats: Number(max_operator_seats) || undefined,
+      datumIsteka: resolvedType === "ENTERPRISE_PERPETUAL_BYO_API" ? null : datumIsteka,
+      law_tracker_sla_expiry: law_tracker_sla_expiry || undefined,
+      boundFingerprint: boundFingerprint || null,
+      boundHost: boundHost || null,
+      tier: tier ? String(tier) : undefined,
     });
+    const decodedPreview = validateLocalLicense(generatedKey);
     const keyFingerprint = crypto
       .createHash("sha256")
       .update(generatedKey)
@@ -546,19 +953,25 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
 
     appendIssuedLicenseAudit({
       issuedAt: new Date().toISOString(),
+      licenseType: resolvedType,
       pibAgencije: String(pibAgencije),
       nazivAgencije: String(nazivAgencije),
-      maksimalnoRadnika: Number(maksimalnoRadnika || 9999),
-      datumIsteka: String(datumIsteka),
-      tier: tier ? String(tier) : "Enterprise",
+      maksimalnoRadnika: decodedPreview.podaci?.maksimalnoRadnika || 500,
+      maxClientCompanies: decodedPreview.podaci?.max_client_companies || 25,
+      maxOperatorSeats: decodedPreview.podaci?.max_operator_seats || 5,
+      datumIsteka: decodedPreview.podaci?.datumIsteka || "PERPETUAL",
+      lawTrackerSlaExpiry: decodedPreview.podaci?.law_tracker_sla_expiry || null,
+      tier: decodedPreview.podaci?.tier || resolvedType,
       keyFingerprint,
     });
 
     res.json({
       success: true,
+      licenseType: resolvedType,
       kljucZaKlijenta: generatedKey,
       licenseKey: generatedKey,
       keyFingerprint,
+      payloadPreview: decodedPreview.podaci,
       napomena:
         "Copy this key and provide it to the accounting firm for workstation activation.",
     });
@@ -570,33 +983,92 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
   }
 });
 
+app.post("/api/license/start-trial", async (req, res) => {
+  try {
+    const {
+      eulaAccepted,
+      companyName = "Evaluation Agency",
+      companyTaxId = "000000000",
+    } = req.body || {};
+
+    if (eulaAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        code: "EULA_REQUIRED",
+        error: "You must accept the End User License Agreement (EULA) before activating a 14-day trial.",
+      });
+    }
+
+    const fingerprint = computeWorkstationFingerprint();
+    const requestHost = String(req.headers.host || "").split(":")[0].toLowerCase();
+    const trialKey = generateB2BLicense({
+      licenseType: "TRIAL_14D",
+      pibAgencije: String(companyTaxId).trim() || "000000000",
+      nazivAgencije: String(companyName).trim() || "Evaluation Agency",
+      datumIsteka: addDaysIso(14),
+      boundFingerprint: fingerprint,
+      boundHost: requestHost || null,
+    });
+
+    activeClientLicenseKey = trialKey;
+    persistActiveLicenseKey(trialKey);
+    await pluginManager.initialize(activeClientLicenseKey);
+    const snapshot = await resolveLicenseStatusSnapshot(activeClientLicenseKey, req.headers.host);
+
+    res.json({
+      success: true,
+      licenseKey: trialKey,
+      status: snapshot,
+      message: "14-day hardware & domain-bound evaluation license activated.",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to activate 14-day trial.",
+      details: error.message,
+    });
+  }
+});
+
 app.get("/api/license/status", async (req, res) => {
   const customKey = String(req.headers["x-license-key"] || req.query.key || "");
-  const snapshot = await resolveLicenseStatusSnapshot(customKey);
+  const snapshot = await resolveLicenseStatusSnapshot(customKey, req.headers.host);
   res.json(snapshot);
 });
 
 app.post("/api/license/activate", async (req, res) => {
   try {
-    const { kljucLicence } = req.body || {};
+    const { kljucLicence, eulaAccepted } = req.body || {};
+    if (eulaAccepted === false) {
+      return res.status(400).json({
+        success: false,
+        code: "EULA_REQUIRED",
+        error: "EULA acceptance is required prior to commercial license activation.",
+      });
+    }
     if (!kljucLicence) {
       res.status(400).json({ success: false, error: "License key is required." });
       return;
     }
-    const validation = validateLocalLicense(kljucLicence);
+    const validation = validateLocalLicense(kljucLicence, req.headers.host);
     if (!validation.validna) {
       res.status(400).json({
         success: false,
+        expired: Boolean(validation.expired),
+        readOnlyLock: Boolean(validation.readOnlyLock),
         error: validation.razlog || "License key is invalid.",
       });
       return;
     }
     activeClientLicenseKey = kljucLicence.trim();
+    persistActiveLicenseKey(activeClientLicenseKey);
     await pluginManager.initialize(activeClientLicenseKey);
+    const snapshot = await resolveLicenseStatusSnapshot(activeClientLicenseKey, req.headers.host);
     res.json({
       success: true,
       message: "License successfully verified and activated on this workstation.",
       licenca: validation.podaci,
+      status: snapshot,
     });
   } catch (error) {
     res.status(500).json({
@@ -609,7 +1081,7 @@ app.post("/api/license/activate", async (req, res) => {
 
 app.post("/api/license/verify", (req, res) => {
   const { kljucLicence } = req.body || {};
-  const validation = validateLocalLicense(kljucLicence);
+  const validation = validateLocalLicense(kljucLicence, req.headers.host);
   res.json(validation);
 });
 
@@ -621,6 +1093,7 @@ const licenseGuardMiddleware = async (req, res, next) => {
         timeCheck.reason ||
         "Access denied: System clock tampering detected.",
       antiClockTampering: true,
+      readOnlyLock: true,
     });
     return;
   }
@@ -644,7 +1117,7 @@ const licenseGuardMiddleware = async (req, res, next) => {
     if (req.path === "/api/ledger/generate-xml") {
       res.status(403).json({
         error:
-          "License required: ePorezi PPP-PD XML export requires an active commercial license key.",
+          "License required: ePorezi PPP-PD XML export requires an active commercial or 14-day trial license.",
         trial: true,
       });
       return;
@@ -653,11 +1126,15 @@ const licenseGuardMiddleware = async (req, res, next) => {
     return;
   }
 
-  const validation = validateLocalLicense(String(clientKey));
+  const validation = validateLocalLicense(String(clientKey), req.headers.host);
   if (!validation.validna) {
     res.status(403).json({
       error:
-        "Access denied: Commercial license for this workstation is inactive or expired.",
+        validation.readOnlyLock
+          ? "Read-Only Lock active: Evaluation trial has expired. Existing client files remain readable while write and export actions are locked."
+          : "Access denied: Commercial license for this workstation is inactive or expired.",
+      readOnlyLock: Boolean(validation.readOnlyLock),
+      expired: Boolean(validation.expired),
       details: validation.razlog,
     });
     return;
@@ -874,6 +1351,29 @@ function persistSanitizedHitlLog(rawBody = {}) {
   return sanitizedEntry;
 }
 
+async function extractAuthorizedByoOverride(req) {
+  const endpoint = req.headers["x-byo-ai-endpoint"] || req.body?.byoConfig?.endpoint || "";
+  const apiKey = req.headers["x-byo-ai-key"] || req.body?.byoConfig?.apiKey || "";
+  const model = req.headers["x-byo-ai-model"] || req.body?.byoConfig?.model || "";
+  if (!endpoint && !apiKey && !model) return null;
+
+  const customKey = String(req.headers["x-license-key"] || "");
+  const snapshot = await resolveLicenseStatusSnapshot(customKey, req.headers.host);
+  if (!snapshot.valid || !snapshot.byoApiAllowed) {
+    const err = new Error(
+      "BYO-API endpoint/key overrides require an active ENTERPRISE_PERPETUAL_BYO_API license.",
+    );
+    err.status = 403;
+    err.code = "BYO_API_REQUIRES_ENTERPRISE";
+    throw err;
+  }
+  return {
+    endpoint: String(endpoint).trim(),
+    apiKey: String(apiKey).trim(),
+    model: String(model).trim(),
+  };
+}
+
 app.post("/api/legal/analyze-document", async (req, res) => {
   try {
     const { base64Data, mimeType, extractedTextSnippet } = req.body || {};
@@ -884,10 +1384,12 @@ app.post("/api/legal/analyze-document", async (req, res) => {
       });
     }
 
+    const byoOverride = await extractAuthorizedByoOverride(req);
     const analysisResult = await analyzeDocumentWithGemini({
       base64Data,
       mimeType,
       extractedTextSnippet,
+      byoOverride,
     });
 
     res.json({
@@ -917,10 +1419,12 @@ app.post("/api/schedule/detect-conflicts", async (req, res) => {
       });
     }
 
+    const byoOverride = await extractAuthorizedByoOverride(req);
     const conflictResult = await detectShiftConflictsWithGemini({
       incomingMessage,
       compactScheduleSummary,
       existingShifts,
+      byoOverride,
     });
 
     res.json({
@@ -1224,7 +1728,7 @@ function ensureLocalWorkspaceTree(rootDir = LOCAL_WORKSPACE_ROOT) {
     fs.writeFileSync(
       readmePath,
       [
-        "SHIFTPULSE LEDGER PRO - LOCAL WORKSPACE DIRECTORY",
+        "SHIFTPULSE LEDGER - LOCAL WORKSPACE DIRECTORY",
         "01_Ulaz_Dokumenta/ -> Drop invoices, delivery notes, slips, and statements for offline scanning",
         "02_Izlaz_Dokumenta/ -> Generated CSV statements, ePorezi XML, payment orders, and contracts",
         "03_Korisnicki_Backup/ -> Encrypted AES-256-GCM user backup archives",
@@ -1238,7 +1742,7 @@ function ensureLocalWorkspaceTree(rootDir = LOCAL_WORKSPACE_ROOT) {
       manifestPath,
       JSON.stringify(
         {
-          app: "ShiftPulse Ledger Pro",
+          app: "ShiftPulse Ledger",
           privacyPolicy: "zero-knowledge-client-device-only",
           createdAt: new Date().toISOString(),
           folders: WORKSPACE_FOLDER_STRUCTURE,
@@ -1271,16 +1775,37 @@ const requireLocalDesktop = (req, res, next) => {
   next();
 };
 
-const legalMonitorService = createLegalMonitorService(__dirname);
+const legalMonitorService = createLegalMonitorService(__dirname, {
+  isLawTrackerSlaActive: async () => {
+    const licSnapshot = await resolveLicenseStatusSnapshot();
+    if (licSnapshot.licenseType === "ENTERPRISE_PERPETUAL_BYO_API") {
+      return {
+        active: licSnapshot.lawTrackerSlaActive !== false,
+        expiresAt: licSnapshot.lawTrackerSlaExpiry || null,
+        reason:
+          licSnapshot.lawTrackerSlaActive === false
+            ? `Annual 20% Law Tracker SLA expired (${licSnapshot.lawTrackerSlaExpiry}). Core deterministic accounting remains operational; renew SLA to resume live regulatory polling.`
+            : null,
+      };
+    }
+    return {
+      active: true,
+      expiresAt: licSnapshot.lawTrackerSlaExpiry || null,
+      reason: null,
+    };
+  },
+});
 
-app.get("/api/gateway/status", (req, res) => {
+app.get("/api/gateway/status", async (req, res) => {
   const localDesktopActive = isLocalDesktopRuntime(req);
-  const lm = legalMonitorService.getStatus();
+  const lm = await legalMonitorService.getStatusWithSla({
+    countryCode: String(req.query.country || ""),
+  });
   res.json({
     success: true,
     gatewayRole: "license-and-regulatory-gateway",
-    launchMarket: "RS",
-    supportedJurisdictions: ["RS"],
+    launchMarket: lm.activeCountryCode || "RS",
+    supportedJurisdictions: Object.keys(lm.countryPacks || { RS: true }),
     zeroKnowledgePrivacy: true,
     clientDataStoredOnServer: false,
     localDesktopActive,
@@ -1288,14 +1813,16 @@ app.get("/api/gateway/status", (req, res) => {
     offlineCapable: true,
     separatedInterfaces: {
       clientWorkspace: "/",
-      publicWebsite: "/site",
+      publicWebsite: "https://veles-lab.com",
       installPortal: "/install",
       adminConsole: "/admin",
     },
     legalMonitorSummary: {
+      activeCountryCode: lm.activeCountryCode,
       watchedLawsCount: lm.laws.length,
       unreadNotifications: lm.telemetry.unreadCount,
       lastCheckAt: lm.telemetry.lastCheckAt,
+      lawTrackerSla: lm.lawTrackerSla,
     },
     pluginsCount: pluginManager.loadedPlugins.size,
     timestamp: new Date().toISOString(),
@@ -1315,10 +1842,10 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/admin", requireAdminAuth);
 
-app.get("/api/admin/overview", (_req, res) => {
+app.get("/api/admin/overview", async (_req, res) => {
   try {
     const mem = process.memoryUsage();
-    const lm = legalMonitorService.getStatus();
+    const lm = await legalMonitorService.getStatusWithSla();
     let hitlTotalCount = 0;
     if (fs.existsSync(HITL_AUDIT_LOG_FILE)) {
       hitlTotalCount = fs
@@ -1345,9 +1872,11 @@ app.get("/api/admin/overview", (_req, res) => {
         privacyGuarantee: "account-and-approval-status-only",
       },
       legalMonitor: {
+        activeCountryCode: lm.activeCountryCode,
         watchedLawsCount: lm.laws.length,
         unreadNotifications: lm.telemetry.unreadCount,
         lastCheckAt: lm.telemetry.lastCheckAt,
+        lawTrackerSla: lm.lawTrackerSla,
       },
       issuedLicenses: readIssuedLicenseAudit(25),
       plugins: pluginManager.getRegistrySnapshot(),
@@ -1359,16 +1888,45 @@ app.get("/api/admin/overview", (_req, res) => {
 });
 
 // ========================================================
-// AUTOMATED LOW-RESOURCE LEGAL CHANGE MONITOR
+// AUTOMATED LOW-RESOURCE LEGAL CHANGE MONITOR (COUNTRY PACKS)
 // ========================================================
-app.get("/api/legal-monitor/status", (_req, res) => {
-  res.json(legalMonitorService.getStatus());
+app.get("/api/legal-monitor/status", async (req, res) => {
+  const countryCode = String(req.query.country || "");
+  res.json(await legalMonitorService.getStatusWithSla({ countryCode }));
 });
 
-app.post("/api/legal-monitor/check-now", requireAdminAuth, async (_req, res) => {
+app.post("/api/legal-monitor/check-now", requireAdminAuth, async (req, res) => {
   try {
-    const result = await legalMonitorService.runLightweightHttpChecks();
+    const countryCode = String(req.body?.countryCode || req.query.country || "");
+    const result = await legalMonitorService.runLightweightHttpChecks({ countryCode });
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/legal-monitor/verify-pack", requireAdminAuth, (req, res) => {
+  try {
+    const { countryCode, operatorId, operatorName, taxRulesVersion, note } = req.body || {};
+    const outcome = legalMonitorService.verifyCountryPack(countryCode, {
+      operatorId,
+      operatorName,
+      taxRulesVersion,
+      note,
+    });
+    if (!outcome.success) return res.status(400).json(outcome);
+    res.json(outcome);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/legal-monitor/active-country", requireAdminAuth, (req, res) => {
+  try {
+    const { countryCode } = req.body || {};
+    const outcome = legalMonitorService.setActiveCountryCode(countryCode);
+    if (!outcome.success) return res.status(400).json(outcome);
+    res.json(outcome);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1395,9 +1953,10 @@ app.post("/api/legal-monitor/compare", requireAdminAuth, (req, res) => {
 
 app.post("/api/legal-monitor/notifications/:id/acknowledge", requireAdminAuth, (req, res) => {
   try {
-    const { adoptAsBaseline } = req.body || {};
+    const { adoptAsBaseline, operatorName } = req.body || {};
     const outcome = legalMonitorService.acknowledgeNotification(req.params.id, {
       adoptAsBaseline: Boolean(adoptAsBaseline),
+      operatorName: operatorName || "",
     });
     if (!outcome.success) {
       return res.status(404).json(outcome);
@@ -1582,7 +2141,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(
-      `[Server] ShiftPulse Ledger Pro running in ${isProduction ? "production" : "development"} mode on port ${PORT}`,
+      `[Server] ShiftPulse Ledger running in ${isProduction ? "production" : "development"} mode on port ${PORT}`,
     );
   });
 }

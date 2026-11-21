@@ -29,6 +29,8 @@ export const BankPaymentOrdersView = () => {
     employees,
     calculatePayrollForCompany,
     setCurrentTab,
+    isReadOnlyLocked,
+    setLicenseActionError,
   } = useShift();
   const { t, intlLocale } = useLanguage();
   const s = t.ui.bankOrdersExtra;
@@ -64,6 +66,10 @@ export const BankPaymentOrdersView = () => {
   };
   const handleDownloadHalcom = () => {
     if (!payrollBatch) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const txt = generateHalcomTxtExport(payrollBatch);
     const blob = new Blob([txt], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -75,6 +81,10 @@ export const BankPaymentOrdersView = () => {
   };
   const handleDownloadXml = () => {
     if (!payrollBatch) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const xml = generateIso20022PainXml(payrollBatch);
     const blob = new Blob([xml], { type: "application/xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);

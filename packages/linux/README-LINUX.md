@@ -1,4 +1,4 @@
-# ShiftPulse Ledger Pro — Linux Instalacioni Paket (Live Testing)
+# ShiftPulse Ledger — Linux Instalacioni Paket (Live Testing)
 
 Ovaj paket je pripremljen za testiranje uživo na svim popularnim **Linux distribucijama (Ubuntu, Debian, Fedora, Arch Linux, Manjaro, openSUSE)**.
 
@@ -19,4 +19,4 @@ Ovaj paket je pripremljen za testiranje uživo na svim popularnim **Linux distri
    ```bash
    ./start-linux.sh
    ```
-   ili pretragom "ShiftPulse Ledger Pro" unutar sistemskog menija (Super key / Start).
+   ili pretragom "ShiftPulse Ledger" unutar sistemskog menija (Super key / Start).

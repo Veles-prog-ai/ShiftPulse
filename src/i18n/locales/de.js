@@ -48,7 +48,7 @@ export const de = {
     aiCopilot: "KI-Assistent",
   },
   header: {
-    appName: "ShiftPulse",
+    appName: "ShiftPulse Ledger",
     subtitle: "Schichtplaner & Lohnabrechnung",
     allJobs: "Alle Arbeitgeber",
     clockedIn: "Schicht l\xE4uft",
@@ -351,7 +351,7 @@ export const de = {
     exportBtn: "JSON-Backup herunterladen",
     importTitle: "Datensicherung wiederherstellen (JSON)",
     importDesc:
-      "W\xE4hlen Sie eine zuvor exportierte ShiftPulse-JSON-Datei aus, um alle Daten wiederherzustellen.",
+      "W\xE4hlen Sie eine zuvor exportierte ShiftPulse Ledger JSON-Datei aus, um alle Daten wiederherzustellen.",
     importBtn: "JSON-Datei ausw\xE4hlen",
     resetTitle: "Lokale Arbeitsbereichsdaten l\xF6schen",
     resetDesc:
@@ -434,23 +434,23 @@ export const de = {
     openPolicy: "Datenschutzerkl\xE4rung & Rechtshinweise ansehen",
     privacySection1Title: "Lokale Speicherung & Keine Daten\xFCbertragung",
     privacySection1Body:
-      "ShiftPulse speichert s\xE4mtliche eingegebenen Daten\u2014einschlie\xDFlich Arbeitgeberprofile, Stundens\xE4tze, Dienstpl\xE4ne, Pausenprotokolle und Kontaktdaten von Vorgesetzten\u2014ausschlie\xDFlich lokal auf Ihrem Endger\xE4t im Speicher des Webbrowsers (localStorage). ShiftPulse betreibt keine zentralen Tracking-Server, erstellt keine Werbeprofile und verkauft Ihre Arbeitsdaten niemals an Dritte.",
+      "ShiftPulse Ledger speichert s\xE4mtliche eingegebenen Daten\u2014einschlie\xDFlich Arbeitgeberprofile, Stundens\xE4tze, Dienstpl\xE4ne, Pausenprotokolle und Kontaktdaten von Vorgesetzten\u2014ausschlie\xDFlich lokal auf Ihrem Endger\xE4t im Speicher des Webbrowsers (localStorage). ShiftPulse Ledger betreibt keine zentralen Tracking-Server, erstellt keine Werbeprofile und verkauft Ihre Arbeitsdaten niemals an Dritte.",
     privacySection2Title: "Volle Datenhoheit & Ein-Klick-Portabilit\xE4t",
     privacySection2Body:
       "Sie behalten die vollst\xE4ndige Kontrolle \xFCber alle Datens\xE4tze. Sie k\xF6nnen jederzeit ein vollst\xE4ndiges JSON-Backup exportieren oder alle lokalen Eintr\xE4ge \xFCber die Datenverwaltung unwiderruflich l\xF6schen.",
     disclaimerSection1Title:
       "Rechtlicher Hinweis zur Lohn- und Gehaltsberechnung",
     disclaimerSection1Body:
-      "ShiftPulse ist ein Hilfsmittel zur pers\xF6nlichen Organisation, Arbeitszeitplanung und Schichtverwaltung. Alle Berechnungen zu Bruttoverg\xFCtungen, \xDCberstundens\xE4tzen, Nachtzuschl\xE4gen und Pausenabz\xFCgen sind automatisierte Sch\xE4tzungen zur pers\xF6nlichen \xDCbersicht. Sie stellen KEINE offizielle Steuer-, Rechts- oder Steuerberatung dar.",
+      "ShiftPulse Ledger ist ein Hilfsmittel zur pers\xF6nlichen Organisation, Arbeitszeitplanung und Schichtverwaltung. Alle Berechnungen zu Bruttoverg\xFCtungen, \xDCberstundens\xE4tzen, Nachtzuschl\xE4gen und Pausenabz\xFCgen sind automatisierte Sch\xE4tzungen zur pers\xF6nlichen \xDCbersicht. Sie stellen KEINE offizielle Steuer-, Rechts- oder Steuerberatung dar.",
     disclaimerSection2Title: "Offizielle Gehaltsabrechnung & \xDCberpr\xFCfung",
     disclaimerSection2Body:
       "Steuers\xE4tze, Sozialversicherungsbeitr\xE4ge und tarifvertragliche Sonderregelungen variieren je nach Rechtsordnung und Tarifvertrag. Gleichen Sie die Angaben stets mit den offiziellen Entgeltabrechnungen Ihres Arbeitgebers ab.",
     laborLawTitle: "Einhaltung von Arbeitszeitrichtlinien & Ruhezeiten",
     laborLawBody:
-      "Die integrierten Referenzmodelle von ShiftPulse orientieren sich an g\xE4ngigen arbeitsrechtlichen Bestimmungen, wie dem deutschen Arbeitszeitgesetz (ArbZG), der EU-Arbeitszeitrichtlinie 2003/88/EG (Mindestruhezeit von 11 ununterbrochenen Stunden pro 24-Stunden-Zeitraum, durchschnittlich maximal 48 Wochenstunden) und entsprechenden Sonderregelungen f\xFCr Nachtarbeit. Diese Hinweise dienen der Orientierung und entbinden nicht von gesetzlichen Arbeitgeber- und Arbeitnehmerpflichten.",
+      "Die integrierten Referenzmodelle von ShiftPulse Ledger orientieren sich an g\xE4ngigen arbeitsrechtlichen Bestimmungen, wie dem deutschen Arbeitszeitgesetz (ArbZG), der EU-Arbeitszeitrichtlinie 2003/88/EG (Mindestruhezeit von 11 ununterbrochenen Stunden pro 24-Stunden-Zeitraum, durchschnittlich maximal 48 Wochenstunden) und entsprechenden Sonderregelungen f\xFCr Nachtarbeit. Diese Hinweise dienen der Orientierung und entbinden nicht von gesetzlichen Arbeitgeber- und Arbeitnehmerpflichten.",
     integrationsTitle: "Direkte Kommunikationslinks & externe Absprachen",
     integrationsBody:
-      "Bei der Nutzung von Verkn\xFCpfungen mit E-Mail-Diensten, LinkedIn, WhatsApp, Telegram oder Kalenderanwendungen nutzt ShiftPulse Standardprotokolle (wie mailto:, https://wa.me/ und Web-URLs). ShiftPulse speichert keine Passw\xF6rter oder Authentifizierungstoken und greift nicht auf Ihre privaten Nachrichten zu. Jede \xDCbermittlung erfolgt ausschlie\xDFlich \xFCber Ihre externe Anwendung nach Ihrer ausdr\xFCcklichen Best\xE4tigung.",
+      "Bei der Nutzung von Verkn\xFCpfungen mit E-Mail-Diensten, LinkedIn, WhatsApp, Telegram oder Kalenderanwendungen nutzt ShiftPulse Ledger Standardprotokolle (wie mailto:, https://wa.me/ und Web-URLs). ShiftPulse Ledger speichert keine Passw\xF6rter oder Authentifizierungstoken und greift nicht auf Ihre privaten Nachrichten zu. Jede \xDCbermittlung erfolgt ausschlie\xDFlich \xFCber Ihre externe Anwendung nach Ihrer ausdr\xFCcklichen Best\xE4tigung.",
   },
   customLang: {
     title: "Sprachpaket-Verwaltung",
@@ -473,7 +473,7 @@ export const de = {
     templateDownloaded:
       "\xDCbersetzungsvorlage heruntergeladen! Bearbeiten Sie diese im Texteditor und laden Sie sie hier hoch.",
     validationNotice:
-      "Benutzerdefinierte Sprachpakete werden gegen das vollst\xE4ndige ShiftPulse-Schema validiert und lokal auf Ihrem Ger\xE4t gespeichert.",
+      "Benutzerdefinierte Sprachpakete werden gegen das vollst\xE4ndige ShiftPulse Ledger Schema validiert und lokal auf Ihrem Ger\xE4t gespeichert.",
   },
   premium: {
     freeBadge: "Kostenlose Version",
@@ -484,8 +484,8 @@ export const de = {
     removeAds: "Werbung entfernen",
     sponsored: "Gesponsert",
     adNotice:
-      "Anzeige \u2022 Unterst\xFCtzen Sie ShiftPulse oder entfernen Sie Werbung mit Pro",
-    modalTitle: "ShiftPulse Premium Pro",
+      "Anzeige \u2022 Unterst\xFCtzen Sie ShiftPulse Ledger oder entfernen Sie Werbung mit Pro",
+    modalTitle: "ShiftPulse Ledger",
     modalSubtitle:
       "Maximieren Sie Ihre Schichtarbeit: Unbegrenzte Arbeitgeber, zirkadiane Schlaferholung, automatische Kalendersynchronisierung und absolute Werbefreiheit.",
     monthly: "Monats-Abo",
@@ -521,9 +521,9 @@ export const de = {
     unlimitedJobsLocked:
       "Die Gratisversion unterst\xFCtzt bis zu 2 Arbeitgeber. Holen Sie sich Pro f\xFCr unbegrenzte Jobs!",
     exportCsvLocked:
-      "Detaillierter CSV-Export ist exklusiv f\xFCr ShiftPulse Pro Mitglieder verf\xFCgbar.",
+      "Detaillierter CSV-Export ist exklusiv f\xFCr ShiftPulse Ledger Mitglieder verf\xFCgbar.",
     advancedRosterLocked:
-      "Das 8-Tage-Kontinentalmodell ist eine ShiftPulse Pro Funktion.",
+      "Das 8-Tage-Kontinentalmodell ist eine ShiftPulse Ledger Funktion.",
     circadianTitle: "Zirkadianer Schlafrechner & Erholungszentrum",
     circadianSubtitle:
       "Personalisierte biologische Empfehlungen zur Minimierung von Schichtarbeiter-M\xFCdigkeit.",

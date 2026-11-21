@@ -273,7 +273,7 @@ export const CommunicationHubModal = ({
     const s = upcomingShifts[0];
     const job = jobs.find((j) => j.id === s.jobId);
     const title = encodeURIComponent(`${c.defaultJobName} – ${job ? job.name : ""}`);
-    const details = encodeURIComponent(`${activeCompany?.naziv || "ShiftPulse"}`);
+    const details = encodeURIComponent(`${activeCompany?.naziv || "ShiftPulse Ledger"}`);
     const dateFormatted = s.date.replace(/-/g, "");
     const startHour = s.startTime.replace(/:/g, "") + "00";
     const endHour = s.endTime.replace(/:/g, "") + "00";

@@ -3,7 +3,7 @@ import { AlertTriangle } from "lucide-react";
 
 /**
  * React Error Boundary isolating UI crashes caused by third-party or
- * client-exclusive plugins so the core ShiftPulse application never crashes.
+ * client-exclusive plugins so the core ShiftPulse Ledger application never crashes.
  */
 export class PluginErrorBoundary extends Component {
   constructor(props) {

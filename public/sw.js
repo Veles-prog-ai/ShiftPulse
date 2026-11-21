@@ -1,4 +1,4 @@
-// ShiftPulse Ledger Pro - Offline-First Service Worker
+// ShiftPulse Ledger - Offline-First Service Worker
 const CACHE_NAME = 'shiftpulse-core-v2';
 const PRECACHE_ASSETS = [
   '/',

@@ -22,8 +22,8 @@ export const WORKSPACE_TREE = {
   "03_Korisnicki_Backup": [],
 };
 
-export const WORKSPACE_README_TEXT = `SHIFTPULSE LEDGER PRO — LOKALNI RADNI PROSTOR (OFFLINE READY)
-==================================================================
+export const WORKSPACE_README_TEXT = `SHIFTPULSE LEDGER — LOKALNI RADNI PROSTOR (OFFLINE READY)
+=============================================================
 Svi poslovni podaci, fakture, otpremnice i obračuni čuvaju se ISKLJUČIVO lokalno na vašem uređaju.
 Centralni server nema uvid u vaše podatke (radi isključivo kao gateway za licencu i propise).
 
@@ -159,7 +159,7 @@ export async function initializeBrowserWorkspaceTree(pickedHandle) {
     "workspace-manifest.json",
     JSON.stringify(
       {
-        app: "ShiftPulse Ledger Pro",
+        app: "ShiftPulse Ledger",
         storagePolicy: "zero-knowledge-local-only",
         createdAt: new Date().toISOString(),
         tree: WORKSPACE_TREE,

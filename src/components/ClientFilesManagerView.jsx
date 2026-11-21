@@ -41,6 +41,8 @@ export const ClientFilesManagerView = () => {
     leaveModalInitialDate,
     addWorkerLeave,
     setCurrentTab,
+    isReadOnlyLocked,
+    setLicenseActionError,
   } = useShift();
   const { t, intlLocale } = useLanguage();
   const [selectedCompanyId, setSelectedCompanyId] = useState(
@@ -98,6 +100,10 @@ export const ClientFilesManagerView = () => {
     kontaktEmail: "",
   });
   const handleExportDossier = (companyId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const jsonStr = exportCompanyDossierJson(companyId);
     const targetComp = companies.find((c) => c.id === companyId);
     const blob = new Blob([jsonStr], { type: "application/json" });
@@ -112,6 +118,11 @@ export const ClientFilesManagerView = () => {
   const handleImportDossier = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (evt) => {
       const content = evt.target?.result;
@@ -125,11 +136,17 @@ export const ClientFilesManagerView = () => {
       }
     };
     reader.readAsText(file);
+    e.target.value = "";
   };
   const handleSavePerson = (e) => {
     e.preventDefault();
     if (!currentCompany || !personForm.ime.trim()) return;
-    addEmployee({
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      setIsAddPersonOpen(false);
+      return;
+    }
+    const createdEmp = addEmployee({
       companyId: currentCompany.id,
       ime: personForm.ime,
       jmbg: personForm.jmbg || "0000000000000",
@@ -146,6 +163,10 @@ export const ClientFilesManagerView = () => {
       smenskiRezim: personForm.smenskiRezim,
       manualOverrides: {},
     });
+    if (!createdEmp) {
+      setIsAddPersonOpen(false);
+      return;
+    }
     setIsAddPersonOpen(false);
     setPersonForm({
       ime: "",
@@ -165,6 +186,11 @@ export const ClientFilesManagerView = () => {
   const handleSaveCompany = (e) => {
     e.preventDefault();
     if (!companyForm.naziv.trim() || !companyForm.pib.trim()) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      setIsNewCompanyOpen(false);
+      return;
+    }
     const created = addCompany({
       naziv: companyForm.naziv,
       pib: companyForm.pib,
@@ -176,6 +202,10 @@ export const ClientFilesManagerView = () => {
       delatnost: companyForm.delatnost,
       kontaktEmail: companyForm.kontaktEmail,
     });
+    if (!created) {
+      setIsNewCompanyOpen(false);
+      return;
+    }
     setSelectedCompanyId(created.id);
     setIsNewCompanyOpen(false);
     setCompanyForm({

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ShiftPulse Ledger Pro - Standalone Distribution Package Generator
+ShiftPulse Ledger - Standalone Distribution Package Generator
 Kreira 3 odvojena instalaciona paketa:
 1. Windows (zip arhiva sa .bat, .ps1, pre-built dist/ i server.js)
 2. Linux (tar.gz arhiva sa .sh, .desktop datotekom, pre-built dist/)

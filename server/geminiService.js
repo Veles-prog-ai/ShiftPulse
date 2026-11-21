@@ -1,24 +1,135 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import net from "net";
+
+function isPrivateOrLoopbackHost(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  if (!host) return true;
+  if (
+    host === "localhost" ||
+    host === "localhost.localdomain" ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host === "::1" ||
+    host === "[::1]"
+  ) {
+    return true;
+  }
+
+  const cleanIp = host.replace(/^\[|\]$/g, "");
+  const ipVersion = net.isIP(cleanIp);
+  if (ipVersion === 4) {
+    const parts = cleanIp.split(".").map(Number);
+    if (parts[0] === 10) return true;
+    if (parts[0] === 127) return true;
+    if (parts[0] === 0) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+  } else if (ipVersion === 6) {
+    const lower = cleanIp.toLowerCase();
+    if (
+      lower === "::1" ||
+      lower === "::" ||
+      lower.startsWith("fc") ||
+      lower.startsWith("fd") ||
+      lower.startsWith("fe80") ||
+      lower.startsWith("::ffff:127.") ||
+      lower.startsWith("::ffff:10.") ||
+      lower.startsWith("::ffff:192.168.")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
- * Returns a configured server-side Gemini client using process.env.GEMINI_API_KEY.
- * The API key is never exposed to client bundles.
+ * Strictly validates Enterprise BYO-API base endpoint URLs to prevent SSRF attacks.
+ * Only external HTTPS URLs without credentials or private/loopback addresses are permitted.
  */
-export function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
+export function validateSafeExternalHttpsEndpoint(rawEndpoint) {
+  if (!rawEndpoint) return null;
+  const trimmed = String(rawEndpoint).trim();
+  if (!trimmed) return null;
+
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    const err = new Error("BYO-API endpoint must be a valid HTTPS URL.");
+    err.status = 400;
+    err.code = "INVALID_BYO_ENDPOINT";
+    throw err;
+  }
+
+  if (parsed.protocol !== "https:") {
+    const err = new Error("BYO-API endpoint must strictly use HTTPS protocol.");
+    err.status = 400;
+    err.code = "INVALID_BYO_ENDPOINT";
+    throw err;
+  }
+
+  if (parsed.username || parsed.password) {
+    const err = new Error("BYO-API endpoint URL must not embed credentials.");
+    err.status = 400;
+    err.code = "INVALID_BYO_ENDPOINT";
+    throw err;
+  }
+
+  if (isPrivateOrLoopbackHost(parsed.hostname)) {
+    const err = new Error("BYO-API endpoint cannot target localhost, loopback, or private network addresses.");
+    err.status = 400;
+    err.code = "INVALID_BYO_ENDPOINT";
+    throw err;
+  }
+
+  return parsed.toString().replace(/\/+$/, "");
+}
+
+/**
+ * Returns a configured server-side Gemini client.
+ * Enterprise BYO-API licenses may supply validated local overrides (key / HTTPS baseUrl / model);
+ * otherwise falls back to server environment variables without exposing secrets to browser bundles.
+ */
+export function getGeminiClient(byoOverride = null) {
+  const overrideKey = byoOverride?.apiKey ? String(byoOverride.apiKey).trim() : "";
+  const overrideEndpoint = byoOverride?.endpoint
+    ? validateSafeExternalHttpsEndpoint(byoOverride.endpoint)
+    : null;
+  const overrideModel = byoOverride?.model ? String(byoOverride.model).trim() : "";
+
+  const envByoEndpoint = process.env.BYO_AI_ENDPOINT
+    ? validateSafeExternalHttpsEndpoint(process.env.BYO_AI_ENDPOINT)
+    : null;
+
+  const resolvedApiKey = overrideKey || process.env.BYO_AI_API_KEY || process.env.GEMINI_API_KEY;
+  if (!resolvedApiKey) return null;
+
+  const resolvedEndpoint = overrideEndpoint || envByoEndpoint;
+  const resolvedModel = overrideModel || process.env.BYO_AI_MODEL || "gemini-4-hydrogen";
+
+  const httpOptions = {
+    headers: {
+      "User-Agent": "aistudio-build",
     },
-  });
+  };
+  if (resolvedEndpoint) {
+    httpOptions.baseUrl = resolvedEndpoint;
+  }
+
+  return {
+    client: new GoogleGenAI({
+      apiKey: resolvedApiKey,
+      httpOptions,
+    }),
+    model: resolvedModel,
+    executionSource: overrideKey || overrideEndpoint ? "enterprise_byo_api" : "gemini_api",
+  };
 }
 
 export function isGeminiConfigured() {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(process.env.GEMINI_API_KEY || process.env.BYO_AI_API_KEY);
 }
 
 /**
@@ -46,16 +157,18 @@ export async function analyzeDocumentWithGemini({
   base64Data,
   mimeType,
   extractedTextSnippet,
+  byoOverride = null,
 }) {
-  const ai = getGeminiClient();
-  if (!ai) {
+  const resolved = getGeminiClient(byoOverride);
+  if (!resolved) {
     const err = new Error(
-      "GEMINI_API_KEY is not configured on the server. Use the deterministic 0-token local document parser.",
+      "GEMINI_API_KEY is not configured on the server. Use the deterministic 0-token local document parser or Enterprise BYO-API.",
     );
     err.status = 503;
     err.code = "GEMINI_KEY_MISSING";
     throw err;
   }
+  const { client: ai, model, executionSource } = resolved;
 
   const parts = [];
   if (extractedTextSnippet) {
@@ -75,7 +188,7 @@ export async function analyzeDocumentWithGemini({
   }
 
   const response = await ai.models.generateContent({
-    model: "gemini-4-hydrogen",
+    model,
     contents: parts,
     config: {
       systemInstruction:
@@ -135,9 +248,9 @@ export async function analyzeDocumentWithGemini({
   return {
     ...parsed,
     aiMeta: {
-      model: "gemini-4-hydrogen",
+      model,
       thinkingLevel: "LOW",
-      executionSource: "gemini_api",
+      executionSource,
       promptTokens: usage.promptTokenCount || 0,
       outputTokens: usage.candidatesTokenCount || 0,
       totalTokens: usage.totalTokenCount || 0,
@@ -152,9 +265,10 @@ export async function detectShiftConflictsWithGemini({
   incomingMessage,
   compactScheduleSummary,
   existingShifts,
+  byoOverride = null,
 }) {
-  const ai = getGeminiClient();
-  if (!ai) {
+  const resolved = getGeminiClient(byoOverride);
+  if (!resolved) {
     const err = new Error(
       "GEMINI_API_KEY is not configured on the server for complex shift message analysis.",
     );
@@ -162,6 +276,7 @@ export async function detectShiftConflictsWithGemini({
     err.code = "GEMINI_KEY_MISSING";
     throw err;
   }
+  const { client: ai, model, executionSource } = resolved;
 
   const scheduleSummary = compactScheduleSummary
     ? String(compactScheduleSummary).slice(0, 1500)
@@ -173,7 +288,7 @@ export async function detectShiftConflictsWithGemini({
       : "No shifts scheduled";
 
   const response = await ai.models.generateContent({
-    model: "gemini-4-hydrogen",
+    model,
     contents: `Schedule: ${scheduleSummary || "Empty"}\nIncoming request: ${String(incomingMessage).slice(0, 1200)}`,
     config: {
       systemInstruction:
@@ -200,9 +315,9 @@ export async function detectShiftConflictsWithGemini({
   return {
     ...parsed,
     aiMeta: {
-      model: "gemini-4-hydrogen",
+      model,
       thinkingLevel: "LOW",
-      executionSource: "gemini_api",
+      executionSource,
       promptTokens: usage.promptTokenCount || 0,
       outputTokens: usage.candidatesTokenCount || 0,
       totalTokens: usage.totalTokenCount || 0,

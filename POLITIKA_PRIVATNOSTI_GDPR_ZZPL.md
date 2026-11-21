@@ -1,8 +1,8 @@
 # POLITIKA PRIVATNOSTI I ZAŠTITA PODATAKA O LIČNOSTI (ZZPL / GDPR)
-**Aplikacija: ShiftPulse Ledger Pro**
+**Aplikacija: ShiftPulse Ledger**
 
 ## 1. Opšte odredbe
-Ova Politika privatnosti uređuje način na koji ShiftPulse Ledger Pro prikuplja, koristi, održava i obrađuje podatke o ličnosti korisnika i zaposlenih u skladu sa Zakonom o zaštiti podataka o ličnosti Republike Srbije ("Sl. glasnik RS", br. 87/2018) i Opštom uredbom o zaštiti podataka EU (GDPR).
+Ova Politika privatnosti uređuje način na koji ShiftPulse Ledger prikuplja, koristi, održava i obrađuje podatke o ličnosti korisnika i zaposlenih u skladu sa Zakonom o zaštiti podataka o ličnosti Republike Srbije ("Sl. glasnik RS", br. 87/2018) i Opštom uredbom o zaštiti podataka EU (GDPR).
 
 ## 2. Podaci koji se obrađuju
 Aplikacija obrađuje sledeće kategorije podataka:

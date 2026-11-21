@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useShift } from "../context/ShiftContext";
 import { useLanguage, interpolate } from "../i18n/LanguageContext";
 import {
   ShieldCheck,
@@ -12,11 +13,26 @@ import {
   Sparkles,
   X,
   AlertTriangle,
+  Cpu,
+  Mail,
+  Scale,
 } from "lucide-react";
 
 export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
+  const {
+    eulaAccepted,
+    refreshLicenseStatus,
+    startTrial14d,
+    activateCommercialLicense,
+    byoApiConfig,
+    saveByoApiConfig,
+    clearByoApiConfig,
+    companies,
+    localAccounts,
+  } = useShift();
   const { t } = useLanguage();
   const s = t.ui.licenseModalFull;
+
   const [activeTab, setActiveTab] = useState("status");
   const [status, setStatus] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,14 +40,25 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
   const [successMsg, setSuccessMsg] = useState(null);
   const [inputKey, setInputKey] = useState("");
   const [isActivating, setIsActivating] = useState(false);
+  const [isStartingTrial, setIsStartingTrial] = useState(false);
+
+  const [byoDraft, setByoDraft] = useState({
+    enabled: Boolean(byoApiConfig?.enabled),
+    endpoint: byoApiConfig?.endpoint || "",
+    apiKey: byoApiConfig?.apiKey || "",
+    model: byoApiConfig?.model || "gemini-4-hydrogen",
+  });
 
   const fetchStatus = async () => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const res = await fetch("/api/license/status");
-      const data = await res.json();
-      setStatus(data);
+      const data = await refreshLicenseStatus();
+      if (data) {
+        setStatus(data);
+      } else {
+        setErrorMsg(s.errReachService);
+      }
     } catch {
       setErrorMsg(s.errReachService);
     } finally {
@@ -43,29 +70,37 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
     fetchStatus();
   }, []);
 
+  useEffect(() => {
+    setByoDraft({
+      enabled: Boolean(byoApiConfig?.enabled),
+      endpoint: byoApiConfig?.endpoint || "",
+      apiKey: byoApiConfig?.apiKey || "",
+      model: byoApiConfig?.model || "gemini-4-hydrogen",
+    });
+  }, [byoApiConfig]);
+
   const handleActivateKey = async (keyToActivate) => {
     const key = (keyToActivate || inputKey).trim();
     if (!key) {
       setErrorMsg(s.errEmptyKey);
       return;
     }
+    if (!eulaAccepted) {
+      setErrorMsg(s.trialRequiresEula);
+      return;
+    }
     setIsActivating(true);
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      const res = await fetch("/api/license/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kljucLicence: key }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccessMsg(data.message || s.okActivated);
+      const res = await activateCommercialLicense(key);
+      if (res.ok) {
+        setSuccessMsg(s.okActivated);
         setInputKey("");
         await fetchStatus();
         if (onLicenseUpdated) onLicenseUpdated();
       } else {
-        setErrorMsg(data.error || s.errActivate);
+        setErrorMsg(res.error || s.errActivate);
       }
     } catch {
       setErrorMsg(s.errServer);
@@ -74,23 +109,78 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
     }
   };
 
-  const getRemainingDays = () => {
+  const handleStartTrial = async () => {
+    if (!eulaAccepted) {
+      setErrorMsg(s.trialRequiresEula);
+      return;
+    }
+    setIsStartingTrial(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await startTrial14d();
+      if (res.ok) {
+        setSuccessMsg(s.trialStartedOk);
+        await fetchStatus();
+        if (onLicenseUpdated) onLicenseUpdated();
+      } else {
+        setErrorMsg(res.error || s.errActivate);
+      }
+    } catch {
+      setErrorMsg(s.errServer);
+    } finally {
+      setIsStartingTrial(false);
+    }
+  };
+
+  const handleSaveByo = (e) => {
+    e.preventDefault();
+    saveByoApiConfig(byoDraft);
+    setSuccessMsg(s.byoSavedMsg);
+  };
+
+  const handleClearByo = () => {
+    clearByoApiConfig();
+    setSuccessMsg(s.byoClearedMsg);
+  };
+
+  const getRemainingDays = (dateStr) => {
     if (
-      !status?.datumIsteka ||
-      status.datumIsteka === "EXPIRED" ||
-      status.datumIsteka === "UNLICENSED" ||
-      status.datumIsteka === "ISTEKLA" ||
-      status.datumIsteka === "TRIAL"
-    )
+      !dateStr ||
+      dateStr === "EXPIRED" ||
+      dateStr === "UNLICENSED" ||
+      dateStr === "ISTEKLA" ||
+      dateStr === "TRIAL" ||
+      dateStr === "PERPETUAL"
+    ) {
       return 0;
-    const exp = new Date(status.datumIsteka + "T23:59:59");
+    }
+    const exp = new Date(dateStr + "T23:59:59");
     const now = new Date();
     const diff = exp.getTime() - now.getTime();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   };
 
-  const remainingDays = getRemainingDays();
+  const remainingDays = getRemainingDays(status?.datumIsteka);
   const isLicensed = Boolean(status?.valid);
+  const licenseType = status?.licenseType || "UNLICENSED_SANDBOX";
+  const tierLabel = s.tierBadges?.[licenseType] || status?.tier || licenseType;
+  const isEnterprise = licenseType === "ENTERPRISE_PERPETUAL_BYO_API" && status?.byoApiAllowed;
+  const isMidMarket = licenseType === "MID_MARKET_ANNUAL";
+  const maxClients = Number(status?.maxClientCompanies) || 25;
+  const maxSeats = Number(status?.maxOperatorSeats) || 5;
+  const usedClients = companies?.length || 0;
+  const usedSeats = localAccounts?.length || 1;
+
+  const addonMailHref = `mailto:support@veles-lab.com?subject=${encodeURIComponent(
+    s.addonMailSubject || "Capacity Add-On",
+  )}&body=${interpolate(s.addonMailBody || "", {
+    entity: status?.licenciraniPravniSubjekat || "Agency",
+    usedClients,
+    maxClients,
+    usedSeats,
+    maxSeats,
+  })}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs">
@@ -102,20 +192,24 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
         <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div
-              className={`p-2 rounded-xl ${isLicensed ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"}`}
+              className={`p-2 rounded-xl ${
+                status?.readOnlyLock
+                  ? "bg-rose-500/20 text-rose-400"
+                  : isLicensed
+                    ? "bg-emerald-500/20 text-emerald-400"
+                    : "bg-amber-500/20 text-amber-400"
+              }`}
             >
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-base sm:text-lg flex items-center gap-2">
+              <h3 className="font-bold text-base sm:text-lg flex items-center gap-2 flex-wrap">
                 {s.headerTitle}
-                <span className="text-xs px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-                  {status?.licenseId ? "RSA-2048" : "AES-256-CBC"}
+                <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono">
+                  {licenseType}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">
-                {s.headerSub}
-              </p>
+              <p className="text-xs text-slate-400">{s.headerSub}</p>
             </div>
           </div>
           <button
@@ -130,7 +224,11 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
         <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 px-5 pt-3 gap-2">
           <button
             onClick={() => setActiveTab("status")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-t-lg transition-colors border-b-2 cursor-pointer ${activeTab === "status" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-t-lg transition-colors border-b-2 cursor-pointer ${
+              activeTab === "status"
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
           >
             <ShieldCheck className="w-4 h-4" />
             <span>{s.tabStatus}</span>
@@ -138,7 +236,11 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
 
           <button
             onClick={() => setActiveTab("activate")}
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-t-lg transition-colors border-b-2 cursor-pointer ${activeTab === "activate" ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"}`}
+            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-t-lg transition-colors border-b-2 cursor-pointer ${
+              activeTab === "activate"
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+            }`}
           >
             <Key className="w-4 h-4" />
             <span>{s.tabActivate}</span>
@@ -190,14 +292,28 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                       </div>
                     )}
 
+                  {status?.readOnlyLock && (
+                    <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 flex items-start gap-3">
+                      <Lock className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-sm">{s.readOnlyBannerTitle}</h4>
+                        <p className="text-xs mt-0.5 leading-relaxed">{s.readOnlyBannerDesc}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Status Card */}
                   <div
-                    className={`p-4 rounded-xl border ${isLicensed ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60" : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60"}`}
+                    className={`p-4 rounded-xl border ${
+                      isLicensed
+                        ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60"
+                        : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/60"
+                    }`}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-10 h-10 rounded-xl text-white flex items-center justify-center ${
+                          className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 ${
                             isLicensed ? "bg-emerald-600" : "bg-amber-600"
                           }`}
                         >
@@ -220,12 +336,208 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
 
                       <button
                         onClick={fetchStatus}
-                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer shrink-0"
                         title={s.reverifyTitle}
                       >
                         <RefreshCw className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {(!isLicensed || licenseType === "UNLICENSED_SANDBOX") && (
+                      <div className="mt-3 pt-3 border-t border-amber-200/70 dark:border-amber-800/50 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400">
+                          {s.fingerprintLabel}: {status?.workstationFingerprint || "—"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleStartTrial}
+                          disabled={isStartingTrial || !eulaAccepted}
+                          className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold cursor-pointer"
+                        >
+                          {isStartingTrial ? s.startingTrialBtn : s.startTrialBtn}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mid-Market Usage & Capacity */}
+                  {isMidMarket && (
+                    <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-800/70 bg-indigo-50/50 dark:bg-indigo-950/25 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                          <span>{s.usageSectionTitle}</span>
+                        </div>
+                        <a
+                          href={addonMailHref}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold transition-colors"
+                        >
+                          <Mail className="w-3 h-3" />
+                          <span>{s.requestAddonBtn}</span>
+                        </a>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                            {interpolate(s.usageClientsLabel, {
+                              used: usedClients,
+                              max: maxClients,
+                            })}
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                usedClients >= maxClients ? "bg-rose-500" : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${Math.min(100, (usedClients / maxClients) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                          <div className="font-semibold text-slate-800 dark:text-slate-200 font-mono">
+                            {interpolate(s.usageSeatsLabel, {
+                              used: usedSeats,
+                              max: maxSeats,
+                            })}
+                          </div>
+                          <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className={`h-full ${
+                                usedSeats >= maxSeats ? "bg-rose-500" : "bg-indigo-500"
+                              }`}
+                              style={{ width: `${Math.min(100, (usedSeats / maxSeats) * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Enterprise Perpetual + Law Tracker SLA Card */}
+                  {licenseType === "ENTERPRISE_PERPETUAL_BYO_API" && (
+                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
+                          <Scale className="w-4 h-4 text-emerald-500" />
+                          <span>{s.slaSectionTitle}</span>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                            status?.lawTrackerSlaActive
+                              ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                              : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
+                          }`}
+                        >
+                          {status?.lawTrackerSlaActive ? s.slaActiveBadge : s.slaExpiredBadge}
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono text-slate-600 dark:text-slate-300">
+                        {interpolate(s.slaExpiryLabel, {
+                          date: status?.lawTrackerSlaExpiry || s.perpetualLabel,
+                        })}
+                      </div>
+                      {!status?.lawTrackerSlaActive && (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                          {s.slaPausedNote}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Enterprise BYO-API Configuration */}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-white">
+                        <Cpu className="w-4 h-4 text-indigo-500" />
+                        <span>{s.byoSectionTitle}</span>
+                      </div>
+                      {!isEnterprise && (
+                        <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                          {s.byoLockedNote}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {s.byoSectionDesc}
+                    </p>
+
+                    {isEnterprise && (
+                      <form onSubmit={handleSaveByo} className="space-y-3 text-xs">
+                        <label className="inline-flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={byoDraft.enabled}
+                            onChange={(e) =>
+                              setByoDraft((prev) => ({ ...prev, enabled: e.target.checked }))
+                            }
+                            className="accent-indigo-600"
+                          />
+                          <span>{s.byoEnableLabel}</span>
+                        </label>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              {s.byoEndpointLabel}
+                            </label>
+                            <input
+                              type="url"
+                              value={byoDraft.endpoint}
+                              onChange={(e) =>
+                                setByoDraft((prev) => ({ ...prev, endpoint: e.target.value }))
+                              }
+                              placeholder={s.byoEndpointPh}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-xs outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              {s.byoKeyLabel}
+                            </label>
+                            <input
+                              type="password"
+                              value={byoDraft.apiKey}
+                              onChange={(e) =>
+                                setByoDraft((prev) => ({ ...prev, apiKey: e.target.value }))
+                              }
+                              placeholder={s.byoKeyPh}
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-xs outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                              {s.byoModelLabel}
+                            </label>
+                            <input
+                              type="text"
+                              value={byoDraft.model}
+                              onChange={(e) =>
+                                setByoDraft((prev) => ({ ...prev, model: e.target.value }))
+                              }
+                              className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-xs outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={handleClearByo}
+                            className="px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold cursor-pointer"
+                          >
+                            {s.byoClearBtn}
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer"
+                          >
+                            {s.byoSaveBtn}
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
 
                   {/* Active Features */}
@@ -269,11 +581,9 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                       <div className="font-bold text-sm text-slate-900 dark:text-white">
                         {status?.licenciraniPravniSubjekat || "—"}
                       </div>
-                      {status?.tier && (
-                        <div className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
-                          {interpolate(s.tierPrefix, { tier: status.tier })}
-                        </div>
-                      )}
+                      <div className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-0.5">
+                        {interpolate(s.tierPrefix, { tier: tierLabel })}
+                      </div>
                       {status?.pibAgencije && (
                         <div className="text-xs text-slate-500 mt-0.5 font-mono">
                           {interpolate(s.pibPrefix, { pib: status.pibAgencije })}
@@ -287,8 +597,12 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                         <span>{s.expTitle}</span>
                       </div>
                       <div className="font-bold text-sm text-slate-900 dark:text-white flex items-center justify-between font-mono tabular-nums">
-                        <span>{status?.datumIsteka || "—"}</span>
-                        {isLicensed && remainingDays > 0 && (
+                        <span>
+                          {status?.corePerpetual
+                            ? s.perpetualLabel
+                            : status?.datumIsteka || "—"}
+                        </span>
+                        {isLicensed && !status?.corePerpetual && remainingDays > 0 && (
                           <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
                             {interpolate(s.daysLeft, { days: remainingDays })}
                           </span>
@@ -324,8 +638,9 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                       <div className="font-bold text-xs text-slate-900 dark:text-white font-mono truncate">
                         {status?.licenseId ? s.rsaToken : s.aesToken}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {s.pinnedNote}
+                      <div className="text-[11px] text-slate-400 mt-0.5 font-mono truncate">
+                        {s.fingerprintLabel}: {status?.boundFingerprint || status?.workstationFingerprint || "—"}
+                        {status?.boundHost ? ` · ${s.boundHostLabel}: ${status.boundHost}` : ""}
                       </div>
                     </div>
                   </div>
@@ -348,15 +663,6 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                         </div>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-xs text-slate-600 dark:text-slate-400 space-y-1">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">
-                      {s.adminNoteTitle}
-                    </p>
-                    <p>
-                      {s.adminNoteBody} (<code className="font-mono">B2B_LICENSE_KEY</code>)
-                    </p>
                   </div>
                 </>
               )}

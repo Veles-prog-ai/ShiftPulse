@@ -1,5 +1,5 @@
 # PRAVNI VODIČ I ZAKONSKA USKLAĐENOST (REPUBLIKA SRBIJA)
-**Aplikacija: ShiftPulse Ledger Pro**
+**Aplikacija: ShiftPulse Ledger**
 
 ## 1. Zakon o radu RS (Ključne odredbe za obračun)
 - **Član 108. - Uvećana zarada:**

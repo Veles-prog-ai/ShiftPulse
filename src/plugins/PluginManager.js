@@ -10,7 +10,7 @@ const TIER_RANK = {
 };
 
 /**
- * Frontend PluginManager for ShiftPulse Ledger Pro.
+ * Frontend PluginManager for ShiftPulse Ledger.
  * Synchronizes authorized plugin manifests against /api/plugins and
  * sys_metadata clock status, loads browser ESM entrypoints dynamically,
  * and isolates every lifecycle hook and UI slot inside try/catch wrappers.

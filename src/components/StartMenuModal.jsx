@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Check,
   Info,
+  ClipboardCheck,
 } from "lucide-react";
 
 const COUNTRY_FLAGS = {
@@ -44,6 +45,7 @@ export const StartMenuModal = ({
   onOpenOperators,
   onOpenLicense,
   onOpenLegal,
+  onOpenOnboarding,
 }) => {
   const {
     setCurrentTab,
@@ -333,6 +335,20 @@ export const StartMenuModal = ({
               <Scale className="w-3.5 h-3.5" />
               <span>{t.ui.footer.compliance}</span>
             </button>
+
+            {onOpenOnboarding && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenOnboarding();
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+              >
+                <ClipboardCheck className="w-3.5 h-3.5" />
+                <span>{t.ui.startMenu.onboardingBtn}</span>
+              </button>
+            )}
           </div>
 
           <button

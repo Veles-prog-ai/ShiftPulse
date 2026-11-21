@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "activeCountryCode": "RS",
+  "countryPacks": {
+    "RS": {
+      "countryCode": "RS",
+      "countryName": "Republic of Serbia",
+      "currency": "RSD",
+      "status": "active",
+      "taxRulesVersion": "2026.1-RS",
+      "requiredHitlVerification": true,
+      "officialGazetteSources": [
+        {
+          "name": "Službeni glasnik Republike Srbije",
+          "url": "https://www.pravno-informacioni-sistem.rs/",
+          "scope": "Primary statutory acts & decrees"
+        },
+        {
+          "name": "Poreska uprava Republike Srbije (ePorezi / PPP-PD)",
+          "url": "https://www.purs.gov.rs/",
+          "scope": "Payroll tax, contributions & corporate income tax"
+        },
+        {
+          "name": "Sistem Elektronskih Faktura (eFaktura / SEF)",
+          "url": "https://www.efaktura.gov.rs/",
+          "scope": "UBL 2.1 e-Invoicing & VAT reporting"
+        }
+      ],
+      "lastVerifiedByOperator": {
+        "operatorId": "op-owner-1",
+        "operatorName": "Chief Accountant (Certified RS)",
+        "verifiedAt": "2026-01-15T09:00:00.000Z",
+        "note": "Baseline template reference for RS jurisdiction pack."
+      },
+      "laws": []
+    },
+    "HR": {
+      "countryCode": "HR",
+      "countryName": "Republic of Croatia",
+      "currency": "EUR",
+      "status": "template",
+      "taxRulesVersion": "2026.0-HR-TEMPLATE",
+      "requiredHitlVerification": true,
+      "officialGazetteSources": [
+        {
+          "name": "Narodne novine (Official Gazette of Croatia)",
+          "url": "https://narodne-novine.nn.hr/",
+          "scope": "Labor Act, Income Tax & VAT statutes"
+        }
+      ],
+      "lastVerifiedByOperator": null,
+      "laws": []
+    },
+    "SI": {
+      "countryCode": "SI",
+      "countryName": "Republic of Slovenia",
+      "currency": "EUR",
+      "status": "template",
+      "taxRulesVersion": "2026.0-SI-TEMPLATE",
+      "requiredHitlVerification": true,
+      "officialGazetteSources": [
+        {
+          "name": "Uradni list Republike Slovenije",
+          "url": "https://www.uradni-list.si/",
+          "scope": "ZDR-1 Employment Relationships & Tax Acts"
+        }
+      ],
+      "lastVerifiedByOperator": null,
+      "laws": []
+    },
+    "ME": {
+      "countryCode": "ME",
+      "countryName": "Montenegro",
+      "currency": "EUR",
+      "status": "template",
+      "taxRulesVersion": "2026.0-ME-TEMPLATE",
+      "requiredHitlVerification": true,
+      "officialGazetteSources": [
+        {
+          "name": "Službeni list Crne Gore",
+          "url": "https://www.sluzbenilist.me/",
+          "scope": "Labor Law & Tax Reform Acts"
+        }
+      ],
+      "lastVerifiedByOperator": null,
+      "laws": []
+    },
+    "DE": {
+      "countryCode": "DE",
+      "countryName": "Federal Republic of Germany",
+      "currency": "EUR",
+      "status": "template",
+      "taxRulesVersion": "2026.0-DE-TEMPLATE",
+      "requiredHitlVerification": true,
+      "officialGazetteSources": [
+        {
+          "name": "Bundesgesetzblatt (BGBl)",
+          "url": "https://www.recht.bund.de/",
+          "scope": "ArbZG Working Time Act & EStG / UStG"
+        }
+      ],
+      "lastVerifiedByOperator": null,
+      "laws": []
+    }
+  },
+  "notifications": [],
+  "telemetry": {
+    "checksRun": 0,
+    "lastCheckAt": null,
+    "lastCheckDurationMs": 0,
+    "intervalHours": 12
+  }
+}

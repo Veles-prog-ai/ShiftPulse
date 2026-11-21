@@ -1,4 +1,4 @@
-// main.js - Electron Desktop Launcher for ShiftPulse Ledger Pro
+// main.js - Electron Desktop Launcher for ShiftPulse Ledger
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -29,7 +29,7 @@ function createWindow() {
     height: 860,
     minWidth: 1024,
     minHeight: 700,
-    title: 'ShiftPulse Ledger Pro - B2B SaaS',
+    title: 'ShiftPulse Ledger - B2B SaaS',
     icon: path.join(__dirname, 'public/icon.svg'),
     webPreferences: {
       nodeIntegration: false,

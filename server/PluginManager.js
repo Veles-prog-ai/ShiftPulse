@@ -27,10 +27,21 @@ export function resolveNormalizedTier(licenseStatus = {}) {
   if (licenseStatus?.antiClockTampering?.isTimeValid === false) {
     return "locked";
   }
+  if (licenseStatus?.readOnlyLock) {
+    return "free";
+  }
+  const licenseType = String(licenseStatus?.licenseType || "").toUpperCase();
   if (licenseStatus?.valid) {
+    if (licenseType === "ENTERPRISE_PERPETUAL_BYO_API") return "enterprise";
+    if (licenseType === "MID_MARKET_ANNUAL") return "pro";
+    if (licenseType === "TRIAL_14D") return "trial";
     const rawTier = String(licenseStatus.tier || "enterprise").toLowerCase();
-    if (rawTier.includes("enterprise") || rawTier.includes("full")) return "enterprise";
-    if (rawTier.includes("pro")) return "pro";
+    if (rawTier.includes("enterprise") || rawTier.includes("perpetual") || rawTier.includes("full")) {
+      return "enterprise";
+    }
+    if (rawTier.includes("pro") || rawTier.includes("mid-market") || rawTier.includes("mid_market")) {
+      return "pro";
+    }
     if (rawTier.includes("starter") || rawTier.includes("basic")) return "starter";
     return "enterprise";
   }
@@ -49,7 +60,7 @@ export function isLicenseTierSufficient(activeTier, requiredTier) {
 }
 
 /**
- * Backend PluginManager for ShiftPulse Ledger Pro.
+ * Backend PluginManager for ShiftPulse Ledger.
  * Scans /plugins manifests, validates license tier & sys_metadata clock integrity,
  * isolates plugin execution inside try/catch boundaries, and exposes hooks & custom routes.
  */

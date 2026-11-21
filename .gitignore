@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+legal_monitor_state.json
+issued_licenses_audit.jsonl
+hitl_approval_audit.jsonl
+.active_license.key
+

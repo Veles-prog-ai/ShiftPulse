@@ -1,8 +1,8 @@
-# ShiftPulse Ledger Pro - Windows PowerShell Commercial Workstation Runner
+# ShiftPulse Ledger - Windows PowerShell Commercial Workstation Runner
 # Run via Right-click -> Run with PowerShell or .\run-windows.ps1
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   ShiftPulse Ledger Pro - Commercial Workstation Runner  " -ForegroundColor Cyan
+Write-Host "   ShiftPulse Ledger - Commercial Workstation Runner  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -34,7 +34,7 @@ $env:NODE_ENV = "production"
 $env:PORT = "3000"
 $env:SHIFTPULSE_LOCAL_DESKTOP = "1"
 $env:SHIFTPULSE_WORKSPACE_DIR = "$env:USERPROFILE\Documents\ShiftPulse_Workspace"
-Write-Host "Starting ShiftPulse Ledger Pro at http://localhost:3000 ..." -ForegroundColor Yellow
+Write-Host "Starting ShiftPulse Ledger at http://localhost:3000 ..." -ForegroundColor Yellow
 if (Test-Path "server.js") {
     node server.js
 } else {

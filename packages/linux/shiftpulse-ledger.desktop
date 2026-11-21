@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=ShiftPulse Ledger Pro
+Name=ShiftPulse Ledger
 GenericName=Payroll & Bookkeeping System
 Comment=B2B Knjigovodstvo, Smenski Rad i ePorezi PPP-PD Obračun
 Exec=bash -c "cd $(dirname %k) && ./start-linux.sh"

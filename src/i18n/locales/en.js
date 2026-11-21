@@ -48,7 +48,7 @@ export const en = {
     aiCopilot: "AI Copilot",
   },
   header: {
-    appName: "ShiftPulse Ledger Pro",
+    appName: "ShiftPulse Ledger",
     subtitle: "Desktop Bookkeeping & Payroll Workstation",
     allJobs: "All Jobs",
     clockedIn: "Clocked In",
@@ -347,7 +347,7 @@ export const en = {
     exportBtn: "Download JSON Backup",
     importTitle: "Restore Backup (JSON)",
     importDesc:
-      "Upload a previously saved ShiftPulse JSON file to restore your entire data state.",
+      "Upload a previously saved ShiftPulse Ledger JSON file to restore your entire data state.",
     importBtn: "Select JSON File",
     resetTitle: "Clear Local Workspace Data",
     resetDesc:
@@ -358,7 +358,7 @@ export const en = {
       "Are you sure you want to clear all local workspace data? Unbacked-up data will be permanently removed.",
     importSuccess: "Data successfully restored!",
     importError:
-      "Error reading JSON file. Please ensure it is a valid ShiftPulse backup.",
+      "Error reading JSON file. Please ensure it is a valid ShiftPulse Ledger backup.",
   },
   communication: {
     hubTitle: "Communication & Connect Hub",
@@ -430,22 +430,22 @@ export const en = {
     openPolicy: "Review Privacy Policy & Legal Disclaimers",
     privacySection1Title: "Local-First Architecture & Zero Data Exfiltration",
     privacySection1Body:
-      "ShiftPulse stores all user information\u2014including employer profiles, hourly compensation rates, shift calendars, break logs, and saved supervisor contacts\u2014exclusively on your client device using browser local storage. ShiftPulse does not operate centralized tracking servers, does not profile user behavior for advertising, and never sells your employment data to third parties.",
+      "ShiftPulse Ledger stores all user information\u2014including employer profiles, hourly compensation rates, shift calendars, break logs, and saved supervisor contacts\u2014exclusively on your client device using browser local storage. ShiftPulse Ledger does not operate centralized tracking servers, does not profile user behavior for advertising, and never sells your employment data to third parties.",
     privacySection2Title: "Data Ownership & One-Click Portability",
     privacySection2Body:
       "You maintain full ownership of all entered information. You can generate a complete JSON export of your data at any time or execute a permanent local wipe using the Data Management controls.",
     disclaimerSection1Title: "Payroll & Financial Estimation Disclaimer",
     disclaimerSection1Body:
-      "ShiftPulse is an organizational, planning, and shift management tool. Calculations for gross pay, overtime premiums, night differentials, and break deductions are automated estimates intended solely for personal budgeting and shift auditing. They do NOT constitute official legal, tax, or accredited accounting advice.",
+      "ShiftPulse Ledger is an organizational, planning, and shift management tool. Calculations for gross pay, overtime premiums, night differentials, and break deductions are automated estimates intended solely for personal budgeting and shift auditing. They do NOT constitute official legal, tax, or accredited accounting advice.",
     disclaimerSection2Title: "Official Paystubs & Verification",
     disclaimerSection2Body:
       "Tax withholding, social security contributions, union dues, and specific collective bargaining agreements vary significantly by jurisdiction. Always verify your compensation against the official paystubs provided by your employer.",
     laborLawTitle: "Labor Law & Rest Compliance References",
     laborLawBody:
-      "ShiftPulse reference models are designed to align with common statutory guidelines such as the EU Working Time Directive (2003/88/EC, mandating minimum 11 consecutive hours of daily rest and 48-hour maximum weekly averages), Serbian Labor Law (Zakon o radu, Article 69 on night work bonus minimum 26%), and the US Fair Labor Standards Act (FLSA). These built-in reminders are informational and do not relieve employers or employees of statutory compliance obligations.",
+      "ShiftPulse Ledger reference models are designed to align with common statutory guidelines such as the EU Working Time Directive (2003/88/EC, mandating minimum 11 consecutive hours of daily rest and 48-hour maximum weekly averages), Serbian Labor Law (Zakon o radu, Article 69 on night work bonus minimum 26%), and the US Fair Labor Standards Act (FLSA). These built-in reminders are informational and do not relieve employers or employees of statutory compliance obligations.",
     integrationsTitle: "Direct Communication & Third-Party Intent Links",
     integrationsBody:
-      "When connecting with Mail, LinkedIn, WhatsApp, Telegram, or Calendar services, ShiftPulse generates standard client-side URLs and intents (such as mailto:, https://wa.me/, and web links). ShiftPulse does not store passwords, OAuth tokens, or read your private messages. Any dispatch occurs strictly through your external application upon your confirmation.",
+      "When connecting with Mail, LinkedIn, WhatsApp, Telegram, or Calendar services, ShiftPulse Ledger generates standard client-side URLs and intents (such as mailto:, https://wa.me/, and web links). ShiftPulse Ledger does not store passwords, OAuth tokens, or read your private messages. Any dispatch occurs strictly through your external application upon your confirmation.",
   },
   customLang: {
     title: "Custom Language Pack Manager",
@@ -468,7 +468,7 @@ export const en = {
     templateDownloaded:
       "Translation template downloaded! Edit it in any text editor and upload here.",
     validationNotice:
-      "Custom language packs are validated against the complete ShiftPulse translation schema and stored locally on your device.",
+      "Custom language packs are validated against the complete ShiftPulse Ledger translation schema and stored locally on your device.",
   },
   premium: {
     freeBadge: "Free Tier",
@@ -478,8 +478,8 @@ export const en = {
     manageSubscription: "Manage Subscription",
     removeAds: "Remove Ads",
     sponsored: "Sponsored",
-    adNotice: "Ad \u2022 Support ShiftPulse or Remove with Pro",
-    modalTitle: "ShiftPulse Premium Pro",
+    adNotice: "Ad \u2022 Support ShiftPulse Ledger or Remove with Pro",
+    modalTitle: "ShiftPulse Ledger",
     modalSubtitle:
       "Supercharge your shift work life with unlimited jobs, circadian recovery intelligence, automated calendar sync, and zero ads.",
     monthly: "Monthly Plan",
@@ -513,9 +513,9 @@ export const en = {
     unlimitedJobsLocked:
       "Free tier supports up to 2 workplaces. Upgrade to Pro for unlimited employers!",
     exportCsvLocked:
-      "Itemized CSV timesheet exports are an exclusive ShiftPulse Pro feature.",
+      "Itemized CSV timesheet exports are an exclusive ShiftPulse Ledger feature.",
     advancedRosterLocked:
-      "Continental 8-day rotation is a ShiftPulse Pro feature.",
+      "Continental 8-day rotation is a ShiftPulse Ledger feature.",
     circadianTitle: "Circadian Shift Worker Wellness & Sleep Engine",
     circadianSubtitle:
       "Personalized circadian rhythm recommendations to optimize recovery between alternating day and night shifts.",

@@ -38,6 +38,50 @@ const ShiftContext = createContext(void 0);
 const COUNTRY_STORAGE_KEY = "shiftpulse_country_jurisdiction_v1";
 const START_MENU_PREF_KEY = "shiftpulse_show_start_menu_v1";
 const DEMO_CLEANUP_FLAG_KEY = "shiftpulse_prod_clean_v1";
+const EULA_ACCEPTED_KEY = "shiftpulse_eula_accepted_v1";
+const BYO_API_CONFIG_KEY = "shiftpulse_enterprise_byo_api_v1";
+const LICENSE_KEY_STORAGE_KEY = "shiftpulse_license_key_v1";
+
+const DEFAULT_BYO_API_CONFIG = {
+  enabled: false,
+  endpoint: "",
+  apiKey: "",
+  model: "gemini-4-hydrogen",
+};
+
+function mapServerLicenseSnapshot(data = {}, cachedKey = "") {
+  return {
+    valid: Boolean(data.valid ?? data.success),
+    trial: Boolean(data.trial),
+    expired: Boolean(data.expired),
+    readOnlyLock: Boolean(data.readOnlyLock),
+    corePerpetual: Boolean(data.corePerpetual),
+    licenseId: data.licenseId || "",
+    licenseType: data.licenseType || (data.valid ? "MID_MARKET_ANNUAL" : "UNLICENSED_SANDBOX"),
+    tier: data.tier || "Sandbox Preview",
+    licenciraniPravniSubjekat:
+      data.licenciraniPravniSubjekat || "Accounting Workstation",
+    pibAgencije: data.pibAgencije || "",
+    issuedAt: data.issuedAt || null,
+    datumIsteka: data.datumIsteka ?? null,
+    coreExpiry: data.coreExpiry ?? data.core_expiry ?? null,
+    lawTrackerSlaExpiry:
+      data.lawTrackerSlaExpiry ?? data.law_tracker_sla_expiry ?? null,
+    lawTrackerSlaActive: data.lawTrackerSlaActive !== false,
+    lawTrackerSlaExpired: Boolean(data.lawTrackerSlaExpired),
+    byoApiAllowed: Boolean(data.byoApiAllowed),
+    boundFingerprint: data.boundFingerprint || null,
+    boundHost: data.boundHost || null,
+    workstationFingerprint: data.workstationFingerprint || "",
+    maksimalnoRadnika: Number(data.maksimalnoRadnika) || 3,
+    maxClientCompanies: Number(data.maxClientCompanies) || 3,
+    maxOperatorSeats: Number(data.maxOperatorSeats) || 2,
+    features: Array.isArray(data.features) ? data.features : [],
+    antiClockTampering: data.antiClockTampering || { isTimeValid: true },
+    kljuc: cachedKey || data.licenseId || "STATION-KEY",
+    poruka: data.poruka || "",
+  };
+}
 
 export const COUNTRY_JURISDICTIONS = [
   {
@@ -157,40 +201,158 @@ const DEFAULT_LEAVES = [];
 const DEFAULT_EMPLOYEES = [];
 const DEFAULT_FINANCIAL_RECORDS = [];
 export const ShiftProvider = ({ children }) => {
-  const [license, setLicense] = useState({
-    valid: true,
-    licenciraniPravniSubjekat: "Enterprise Workstation",
-    pibAgencije: "",
-    datumIsteka: "2030-12-31",
-    kljuc: "SPPRO-ENTERPRISE-ACTIVE",
-    poruka: "Licensed local-first workstation active.",
+  const [eulaAccepted, setEulaAccepted] = useState(() => {
+    try {
+      return localStorage.getItem(EULA_ACCEPTED_KEY) === "1";
+    } catch {
+      return false;
+    }
   });
+  const acceptEula = () => {
+    setEulaAccepted(true);
+    try {
+      localStorage.setItem(EULA_ACCEPTED_KEY, "1");
+    } catch {}
+  };
+
+  const [byoApiConfig, setByoApiConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem(BYO_API_CONFIG_KEY);
+      if (saved) {
+        return { ...DEFAULT_BYO_API_CONFIG, ...JSON.parse(saved) };
+      }
+    } catch {}
+    return DEFAULT_BYO_API_CONFIG;
+  });
+
+  const saveByoApiConfig = (nextConfig = {}) => {
+    const cleaned = {
+      enabled: Boolean(nextConfig.enabled),
+      endpoint: String(nextConfig.endpoint || "").trim(),
+      apiKey: String(nextConfig.apiKey || "").trim(),
+      model: String(nextConfig.model || "gemini-4-hydrogen").trim() || "gemini-4-hydrogen",
+    };
+    setByoApiConfig(cleaned);
+    try {
+      localStorage.setItem(BYO_API_CONFIG_KEY, JSON.stringify(cleaned));
+    } catch {}
+    return cleaned;
+  };
+
+  const clearByoApiConfig = () => {
+    setByoApiConfig(DEFAULT_BYO_API_CONFIG);
+    try {
+      localStorage.removeItem(BYO_API_CONFIG_KEY);
+    } catch {}
+  };
+
+  const [license, setLicense] = useState(() =>
+    mapServerLicenseSnapshot({
+      valid: false,
+      trial: true,
+      readOnlyLock: false,
+      licenseType: "UNLICENSED_SANDBOX",
+      tier: "Sandbox Preview",
+      licenciraniPravniSubjekat: "ShiftPulse Workstation",
+      poruka: "Checking workstation license...",
+    }),
+  );
+  const [licenseActionError, setLicenseActionError] = useState(null);
+  const clearLicenseActionError = () => setLicenseActionError(null);
+
+  const isReadOnlyLocked = Boolean(license?.readOnlyLock);
+
+  const refreshLicenseStatus = async (keyOverride = "") => {
+    try {
+      const storedKey =
+        keyOverride || localStorage.getItem(LICENSE_KEY_STORAGE_KEY) || "";
+      const headers = {};
+      if (storedKey) headers["x-license-key"] = storedKey;
+      const res = await fetch("/api/license/status", { headers });
+      const data = await res.json();
+      if (data) {
+        const mapped = mapServerLicenseSnapshot(data, storedKey);
+        setLicense(mapped);
+        return mapped;
+      }
+    } catch {
+      setLicense((prev) => ({
+        ...prev,
+        valid: false,
+        byoApiAllowed: false,
+        poruka: "Offline local workstation mode.",
+      }));
+    }
+    return null;
+  };
+
+  const startTrial14d = async ({
+    companyName = "Evaluation Agency",
+    companyTaxId = "000000000",
+  } = {}) => {
+    if (!eulaAccepted) {
+      return { ok: false, code: "EULA_REQUIRED", error: "EULA acceptance required." };
+    }
+    const res = await fetch("/api/license/start-trial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        eulaAccepted: true,
+        companyName,
+        companyTaxId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) {
+      return { ok: false, error: data?.error || "Failed to start 14-day trial.", code: data?.code };
+    }
+    if (data.licenseKey) {
+      try {
+        localStorage.setItem(LICENSE_KEY_STORAGE_KEY, data.licenseKey);
+      } catch {}
+    }
+    const mapped = mapServerLicenseSnapshot(data.status || {}, data.licenseKey || "");
+    setLicense(mapped);
+    setLicenseActionError(null);
+    return { ok: true, status: mapped, licenseKey: data.licenseKey };
+  };
+
+  const activateCommercialLicense = async (kljucLicence) => {
+    if (!eulaAccepted) {
+      return { ok: false, code: "EULA_REQUIRED", error: "EULA acceptance required." };
+    }
+    const trimmed = String(kljucLicence || "").trim();
+    const res = await fetch("/api/license/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kljucLicence: trimmed,
+        eulaAccepted: true,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) {
+      if (data?.readOnlyLock) {
+        await refreshLicenseStatus(trimmed);
+      }
+      return {
+        ok: false,
+        error: data?.error || "License activation failed.",
+        expired: Boolean(data?.expired),
+        readOnlyLock: Boolean(data?.readOnlyLock),
+      };
+    }
+    try {
+      localStorage.setItem(LICENSE_KEY_STORAGE_KEY, trimmed);
+    } catch {}
+    const mapped = mapServerLicenseSnapshot(data.status || {}, trimmed);
+    setLicense(mapped);
+    setLicenseActionError(null);
+    return { ok: true, status: mapped };
+  };
+
   useEffect(() => {
-    fetch("/api/license/status")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data) {
-          setLicense({
-            valid: data.success ?? true,
-            licenciraniPravniSubjekat:
-              data.licenciraniPravniSubjekat || "Accounting Station",
-            pibAgencije: data.pibAgencije || "",
-            datumIsteka: data.datumIsteka || "2030-12-31",
-            kljuc: "B2B-PRO-KEY",
-            poruka: data.poruka || "License active.",
-          });
-        }
-      })
-      .catch(() => {
-        setLicense({
-          valid: true,
-          licenciraniPravniSubjekat: "Accounting Station (Offline Local Mode)",
-          pibAgencije: "",
-          datumIsteka: "2030-12-31",
-          kljuc: "LOCAL-VALID",
-          poruka: "Offline local authorization active.",
-        });
-      });
+    refreshLicenseStatus();
   }, []);
   const [companies, setCompanies] = useState(() => {
     try {
@@ -338,6 +500,27 @@ export const ShiftProvider = ({ children }) => {
   });
   const openStartMenu = () => setIsStartMenuOpen(true);
   const closeStartMenu = () => setIsStartMenuOpen(false);
+
+  const [isAccountsHitlOpen, setIsAccountsHitlOpen] = useState(false);
+  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+  const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [legalModalState, setLegalModalState] = useState({
+    isOpen: false,
+    tab: "privacy",
+  });
+  const openAccountsHitl = () => setIsAccountsHitlOpen(true);
+  const closeAccountsHitl = () => setIsAccountsHitlOpen(false);
+  const openLicenseModal = () => setIsLicenseModalOpen(true);
+  const closeLicenseModal = () => setIsLicenseModalOpen(false);
+  const openDataModal = () => setIsDataModalOpen(true);
+  const closeDataModal = () => setIsDataModalOpen(false);
+  const openOnboarding = () => setIsOnboardingOpen(true);
+  const closeOnboarding = () => setIsOnboardingOpen(false);
+  const openLegalModal = (tab = "privacy") =>
+    setLegalModalState({ isOpen: true, tab });
+  const closeLegalModal = () =>
+    setLegalModalState((prev) => ({ ...prev, isOpen: false }));
 
   const [commHubConfig, setCommHubConfig] = useState({
     isOpen: false,
@@ -553,6 +736,19 @@ export const ShiftProvider = ({ children }) => {
     pin = "",
     hitlPolicy = DEFAULT_HITL_POLICY,
   }) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return { error: "READ_ONLY_LOCK" };
+    }
+    if (
+      license?.valid &&
+      license?.licenseType === "MID_MARKET_ANNUAL" &&
+      localAccounts.length >= (Number(license?.maxOperatorSeats) || 5)
+    ) {
+      const maxSeats = Number(license?.maxOperatorSeats) || 5;
+      setLicenseActionError({ code: "LIMIT_SEATS", max: maxSeats });
+      return { error: "LIMIT_SEATS", max: maxSeats };
+    }
     const cleanUser = String(username || displayName || "operater")
       .trim()
       .toLowerCase()
@@ -575,6 +771,10 @@ export const ShiftProvider = ({ children }) => {
   };
 
   const updateLocalAccount = async (accountId, updates = {}) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     let nextPinHash;
     if (typeof updates.newPin === "string") {
       nextPinHash = updates.newPin ? await hashPinSha256(updates.newPin) : "";
@@ -598,6 +798,10 @@ export const ShiftProvider = ({ children }) => {
   };
 
   const deleteLocalAccount = (accountId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return false;
+    }
     if (localAccounts.length <= 1) return false;
     const remaining = localAccounts.filter((a) => a.id !== accountId);
     setLocalAccounts(remaining);
@@ -777,6 +981,21 @@ export const ShiftProvider = ({ children }) => {
   }, [darkMode]);
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
   const addCompany = (companyData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
+    if (
+      license?.valid &&
+      license?.licenseType === "MID_MARKET_ANNUAL" &&
+      companies.length >= (Number(license?.maxClientCompanies) || 25)
+    ) {
+      setLicenseActionError({
+        code: "LIMIT_CLIENTS",
+        max: Number(license?.maxClientCompanies) || 25,
+      });
+      return null;
+    }
     const newCompany = {
       ...companyData,
       id: `firma-${Date.now()}`,
@@ -786,6 +1005,10 @@ export const ShiftProvider = ({ children }) => {
     return newCompany;
   };
   const updateCompany = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setCompanies((prev) =>
       prev.map((c) => (c.id === id ? { ...c, ...updates } : c)),
     );
@@ -794,6 +1017,10 @@ export const ShiftProvider = ({ children }) => {
     }
   };
   const deleteCompany = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setCompanies((prev) => prev.filter((c) => c.id !== id));
     setEmployees((prev) => prev.filter((e) => e.companyId !== id));
     if (activeCompany?.id === id) {
@@ -820,6 +1047,10 @@ export const ShiftProvider = ({ children }) => {
     return JSON.stringify(dossier, null, 2);
   };
   const importCompanyDossierJson = (jsonStr) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return false;
+    }
     try {
       const parsed = JSON.parse(jsonStr);
       if (parsed && parsed.company && parsed.company.pib) {
@@ -834,6 +1065,17 @@ export const ShiftProvider = ({ children }) => {
           );
           setActiveCompany(parsed.company);
         } else {
+          if (
+            license?.valid &&
+            license?.licenseType === "MID_MARKET_ANNUAL" &&
+            companies.length >= (Number(license?.maxClientCompanies) || 25)
+          ) {
+            setLicenseActionError({
+              code: "LIMIT_CLIENTS",
+              max: Number(license?.maxClientCompanies) || 25,
+            });
+            return false;
+          }
           setCompanies((prev) => [...prev, parsed.company]);
           setActiveCompany(parsed.company);
         }
@@ -853,6 +1095,10 @@ export const ShiftProvider = ({ children }) => {
     }
   };
   const addEmployee = (empData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
     const newEmp = {
       ...empData,
       id: `r-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -865,11 +1111,19 @@ export const ShiftProvider = ({ children }) => {
     return newEmp;
   };
   const updateEmployee = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setEmployees((prev) =>
       prev.map((e) => (e.id === id ? { ...e, ...updates } : e)),
     );
   };
   const deleteEmployee = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const emp = employees.find((e) => e.id === id);
     setEmployees((prev) => prev.filter((e) => e.id !== id));
     if (emp) {
@@ -883,6 +1137,10 @@ export const ShiftProvider = ({ children }) => {
     }
   };
   const updateWorkerRegime = (employeeId, regime) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setEmployees((prev) =>
       prev.map((emp) =>
         emp.id === employeeId ? { ...emp, smenskiRezim: regime } : emp,
@@ -890,6 +1148,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const updateWorkerDayOverride = (employeeId, date, override) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setEmployees((prev) =>
       prev.map((emp) => {
         if (emp.id !== employeeId) return emp;
@@ -913,6 +1175,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const addWorkerLeave = (leaveData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setLeaves((prev) => [leaveData, ...prev]);
 
     setEmployees((prev) =>
@@ -952,6 +1218,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const deleteWorkerLeave = (leaveId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setLeaves((prev) => prev.filter((l) => l.id !== leaveId));
 
     setEmployees((prev) =>
@@ -979,6 +1249,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const calculatePayrollForCompany = async (companyId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const targetEmployees = employees.filter((e) => e.companyId === companyId);
     if (targetEmployees.length === 0) return;
     try {
@@ -1003,6 +1277,10 @@ export const ShiftProvider = ({ children }) => {
     }
   };
   const addJob = (jobData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
     const newJob = {
       ...jobData,
       id: `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -1012,11 +1290,19 @@ export const ShiftProvider = ({ children }) => {
     return newJob;
   };
   const updateJob = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setJobs((prev) =>
       prev.map((j) => (j.id === id ? { ...j, ...updates } : j)),
     );
   };
   const deleteJob = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setJobs((prev) => prev.filter((j) => j.id !== id));
     setShifts((prev) => prev.filter((s) => s.jobId !== id));
   };
@@ -1076,6 +1362,10 @@ export const ShiftProvider = ({ children }) => {
     return addJob(newJobData);
   };
   const addShift = (shiftData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
     const newShift = {
       ...shiftData,
       id: `shift-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -1085,14 +1375,26 @@ export const ShiftProvider = ({ children }) => {
     return newShift;
   };
   const updateShift = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setShifts((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     );
   };
   const deleteShift = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setShifts((prev) => prev.filter((s) => s.id !== id));
   };
   const addShiftsBatch = (newShiftsData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const timestamp = Date.now();
     const createdList = newShiftsData.map((s, idx) => ({
       ...s,
@@ -1102,6 +1404,10 @@ export const ShiftProvider = ({ children }) => {
     setShifts((prev) => [...createdList, ...prev]);
   };
   const deleteShiftsByJobAndRange = (jobId, startDate, endDate) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setShifts((prev) =>
       prev.filter(
         (s) => !(s.jobId === jobId && s.date >= startDate && s.date <= endDate),
@@ -1109,6 +1415,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const duplicateShift = (shiftId, targetDate) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const existing = shifts.find((s) => s.id === shiftId);
     if (!existing) return;
     const duplicated = {
@@ -1125,6 +1435,10 @@ export const ShiftProvider = ({ children }) => {
     setShifts((prev) => [duplicated, ...prev]);
   };
   const addBreakToShift = (shiftId, breakData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const newBreak = {
       ...breakData,
       id: `break-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1140,6 +1454,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const removeBreakFromShift = (shiftId, breakId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setShifts((prev) =>
       prev.map((s) => {
         if (s.id !== shiftId) return s;
@@ -1151,6 +1469,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const updateBreakInShift = (shiftId, breakId, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setShifts((prev) =>
       prev.map((s) => {
         if (s.id !== shiftId) return s;
@@ -1164,6 +1486,10 @@ export const ShiftProvider = ({ children }) => {
     );
   };
   const clockIn = (jobId) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const now = /* @__PURE__ */ new Date();
     const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
     const dateStr = now.toISOString().split("T")[0];
@@ -1177,6 +1503,7 @@ export const ShiftProvider = ({ children }) => {
       breaks: [],
       notes: "Logged via live clock in",
     });
+    if (!createdShift) return;
     setActiveClock({
       jobId,
       shiftId: createdShift.id,
@@ -1185,6 +1512,10 @@ export const ShiftProvider = ({ children }) => {
     });
   };
   const clockOut = () => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     if (!activeClock) return;
     const now = /* @__PURE__ */ new Date();
     const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
@@ -1240,6 +1571,10 @@ export const ShiftProvider = ({ children }) => {
     });
   };
   const addProfessionalEvent = (eventData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
     const newEvent = {
       ...eventData,
       id: `ev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1249,14 +1584,26 @@ export const ShiftProvider = ({ children }) => {
     return newEvent;
   };
   const updateProfessionalEvent = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setProfessionalEvents((prev) =>
       prev.map((ev) => (ev.id === id ? { ...ev, ...updates } : ev)),
     );
   };
   const deleteProfessionalEvent = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setProfessionalEvents((prev) => prev.filter((ev) => ev.id !== id));
   };
   const addFinancialRecord = (recordData) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return null;
+    }
     const draftRec = {
       ...recordData,
       id: recordData.id || `fin-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1268,6 +1615,10 @@ export const ShiftProvider = ({ children }) => {
     return newRec;
   };
   const addFinancialRecordsBatch = (recordsList = []) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return [];
+    }
     const nowIso = new Date().toISOString();
     const prepared = recordsList.map((r, idx) =>
       pluginManager.runLedgerEntryCreateHooks({
@@ -1281,14 +1632,26 @@ export const ShiftProvider = ({ children }) => {
     return prepared;
   };
   const updateFinancialRecord = (id, updates) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setFinancialRecords((prev) =>
       prev.map((rec) => (rec.id === id ? { ...rec, ...updates } : rec)),
     );
   };
   const deleteFinancialRecord = (id) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setFinancialRecords((prev) => prev.filter((rec) => rec.id !== id));
   };
   const clearWorkspaceData = () => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setCompanies([]);
     setActiveCompany(null);
     setEmployees([]);
@@ -1311,12 +1674,16 @@ export const ShiftProvider = ({ children }) => {
       localAccounts,
       localHitlLogs,
       exportedAt: /* @__PURE__ */ new Date().toISOString(),
-      app: "ShiftPulse Ledger Pro",
+      app: "ShiftPulse Ledger",
       version: "2.7",
     };
     return JSON.stringify(data, null, 2);
   };
   const importDataJson = (json) => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return false;
+    }
     try {
       const parsed = JSON.parse(json);
       if (Array.isArray(parsed.companies)) setCompanies(parsed.companies);
@@ -1340,6 +1707,37 @@ export const ShiftProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       license,
+      refreshLicenseStatus,
+      startTrial14d,
+      activateCommercialLicense,
+      isReadOnlyLocked,
+      licenseActionError,
+      setLicenseActionError,
+      clearLicenseActionError,
+      eulaAccepted,
+      acceptEula,
+      byoApiConfig,
+      saveByoApiConfig,
+      clearByoApiConfig,
+      isAccountsHitlOpen,
+      setIsAccountsHitlOpen,
+      openAccountsHitl,
+      closeAccountsHitl,
+      isLicenseModalOpen,
+      setIsLicenseModalOpen,
+      openLicenseModal,
+      closeLicenseModal,
+      isDataModalOpen,
+      setIsDataModalOpen,
+      openDataModal,
+      closeDataModal,
+      isOnboardingOpen,
+      setIsOnboardingOpen,
+      openOnboarding,
+      closeOnboarding,
+      legalModalState,
+      openLegalModal,
+      closeLegalModal,
       companies,
       activeCompany,
       setActiveCompany,
@@ -1465,6 +1863,15 @@ export const ShiftProvider = ({ children }) => {
     }),
     [
       license,
+      isReadOnlyLocked,
+      licenseActionError,
+      eulaAccepted,
+      byoApiConfig,
+      isAccountsHitlOpen,
+      isLicenseModalOpen,
+      isDataModalOpen,
+      isOnboardingOpen,
+      legalModalState,
       companies,
       activeCompany,
       employees,

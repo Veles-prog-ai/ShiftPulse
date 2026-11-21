@@ -99,7 +99,7 @@ export const SubscriptionModal = ({ onClose, onOpenCircadian }) => {
           <div className="flex items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-white text-slate-950 flex items-center gap-1 shadow-sm">
               <Crown className="w-3.5 h-3.5 text-amber-600" />
-              <span>ShiftPulse Pro</span>
+              <span>ShiftPulse Ledger</span>
             </span>
             {isPremium && (
               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-400 text-emerald-950 flex items-center gap-1">

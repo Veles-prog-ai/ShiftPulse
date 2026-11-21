@@ -72,6 +72,8 @@ export const FinancialProfitTaxView = () => {
     loadWorkspaceInputFileObject,
     saveOutputDocumentToWorkspace,
     openCommHub,
+    isReadOnlyLocked,
+    setLicenseActionError,
   } = useShift();
   const { t, intlLocale } = useLanguage();
   const p = t.ui.profitTaxFull;
@@ -238,6 +240,10 @@ export const FinancialProfitTaxView = () => {
 
   const handleBookDraftRecord = () => {
     if (!draftRecord) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     if (!draftRecord.grossAmount || Number(draftRecord.grossAmount) <= 0) {
       setScanNotice({
         type: "error",
@@ -246,12 +252,13 @@ export const FinancialProfitTaxView = () => {
       return;
     }
     const kontoInfo = KONTNI_OKVIR_CATALOG[draftRecord.konto];
-    addFinancialRecord({
+    const saved = addFinancialRecord({
       ...draftRecord,
       companyId: activeCompany?.id,
       pibValid: validateSerbianPib(draftRecord.partnerPib),
       kontoLabel: kontoInfo?.name || draftRecord.kontoLabel || "Business Transaction",
     });
+    if (!saved) return;
     setScanNotice({
       type: "success",
       text: interpolate(p.postedOk, {
@@ -267,6 +274,10 @@ export const FinancialProfitTaxView = () => {
 
   const handleBookBatch = () => {
     if (!scanResult?.records?.length) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     const prepared = scanResult.records.map((r) => ({
       ...r,
       companyId: activeCompany?.id,
@@ -280,6 +291,10 @@ export const FinancialProfitTaxView = () => {
   };
 
   const openManualCreate = () => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     setEditingRecordId(null);
     setManualForm({
       date: new Date().toISOString().split("T")[0],
@@ -343,6 +358,11 @@ export const FinancialProfitTaxView = () => {
 
   const handleSaveManual = (e) => {
     e.preventDefault();
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      setManualModalOpen(false);
+      return;
+    }
     const net = parseFloat(manualForm.netAmount) || 0;
     const vat = parseFloat(manualForm.vatAmount) || 0;
     const gross = parseFloat(manualForm.grossAmount) || Math.round((net + vat) * 100) / 100;
@@ -363,7 +383,11 @@ export const FinancialProfitTaxView = () => {
     if (editingRecordId) {
       updateFinancialRecord(editingRecordId, payload);
     } else {
-      addFinancialRecord(payload);
+      const created = addFinancialRecord(payload);
+      if (!created) {
+        setManualModalOpen(false);
+        return;
+      }
     }
     setManualModalOpen(false);
     setEditingRecordId(null);
@@ -402,6 +426,10 @@ export const FinancialProfitTaxView = () => {
   };
 
   const handleExportCsv = async () => {
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      return;
+    }
     await pluginManager.runBeforeReportExportHooks({
       reportType: "profit-tax-csv",
       activeCompany,

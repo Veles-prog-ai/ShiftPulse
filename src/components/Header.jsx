@@ -18,10 +18,11 @@ import {
   Compass,
   Globe,
   Puzzle,
+  ClipboardCheck,
+  Lock,
 } from "lucide-react";
 import { DataManagementModal } from "./DataManagementModal";
 import { CommunicationHubModal } from "./CommunicationHubModal";
-import { LegalPrivacyModal } from "./LegalPrivacyModal";
 import { LanguageImportModal } from "./LanguageImportModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { CircadianWellnessModal } from "./CircadianWellnessModal";
@@ -50,31 +51,25 @@ export const Header = () => {
     openStartMenu,
     closeStartMenu,
     setCurrentTab,
+    license,
+    isReadOnlyLocked,
+    isAccountsHitlOpen,
+    openAccountsHitl,
+    closeAccountsHitl,
+    isLicenseModalOpen,
+    openLicenseModal,
+    closeLicenseModal,
+    isDataModalOpen,
+    openDataModal,
+    closeDataModal,
+    openOnboarding,
+    openLegalModal,
   } = useShift();
   const { customRoutes, reloadPlugins } = usePlugins();
   const { t, language, setLanguage, supportedLanguages } = useLanguage();
-  const [isDataModalOpen, setIsDataModalOpen] = useState(false);
-  const [isAccountsHitlOpen, setIsAccountsHitlOpen] = useState(false);
-  const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
-  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
-  const [legalTab, setLegalTab] = useState("privacy");
   const [isLangImportOpen, setIsLangImportOpen] = useState(false);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const [license, setLicense] = useState(null);
   const langMenuRef = useRef(null);
-
-  useEffect(() => {
-    fetch("/api/license/status")
-      .then((res) => res.json())
-      .then((data) => {
-        setLicense({
-          valid: Boolean(data.valid && data.success),
-        });
-      })
-      .catch(() => {
-        setLicense({ valid: false });
-      });
-  }, [isLicenseModalOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -275,24 +270,42 @@ export const Header = () => {
               </button>
             ))}
 
+            {/* Self-Serve Onboarding Checklist */}
+            <button
+              type="button"
+              onClick={openOnboarding}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors font-semibold text-xs cursor-pointer whitespace-nowrap shrink-0"
+              title={t.ui.onboardingChecklist?.title}
+              aria-label={t.ui.header.onboardingBtn}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">{t.ui.header.onboardingBtn}</span>
+            </button>
+
             {/* B2B Commercial License Status */}
             <button
-              onClick={() => setIsLicenseModalOpen(true)}
+              onClick={openLicenseModal}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border font-semibold text-xs cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-                license && license.valid
-                  ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
-                  : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                isReadOnlyLocked
+                  ? "border-rose-300 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/60"
+                  : license && license.valid
+                    ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60"
+                    : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
               }`}
               title={t.ui.license.title}
               aria-label={t.ui.header.license}
             >
-              <Shield
-                className={`w-3.5 h-3.5 ${
-                  license && license.valid
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-amber-600 dark:text-amber-400"
-                }`}
-              />
+              {isReadOnlyLocked ? (
+                <Lock className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+              ) : (
+                <Shield
+                  className={`w-3.5 h-3.5 ${
+                    license && license.valid
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  }`}
+                />
+              )}
               <span className="hidden sm:inline">
                 {license && license.valid ? t.ui.header.license : t.ui.common.inactive}
               </span>
@@ -300,10 +313,7 @@ export const Header = () => {
 
             {/* Legal Center */}
             <button
-              onClick={() => {
-                setLegalTab("privacy");
-                setIsLegalModalOpen(true);
-              }}
+              onClick={() => openLegalModal("privacy")}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors font-semibold text-xs cursor-pointer whitespace-nowrap shrink-0"
               title={t.ui.legalCenter.title}
               aria-label={t.ui.legalCenter.title}
@@ -314,7 +324,7 @@ export const Header = () => {
 
             {/* Local Operators & HITL Control */}
             <button
-              onClick={() => setIsAccountsHitlOpen(true)}
+              onClick={openAccountsHitl}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors font-semibold text-xs cursor-pointer max-w-[140px] whitespace-nowrap shrink-0"
               title={t.ui.accountsHitl.title}
               aria-label={t.ui.header.accounts}
@@ -327,7 +337,7 @@ export const Header = () => {
 
             {/* Local Workspace & Cloud Backup */}
             <button
-              onClick={() => setIsDataModalOpen(true)}
+              onClick={openDataModal}
               className="w-8 h-8 rounded-lg flex items-center justify-center border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
               title={t.ui.header.workspace}
               aria-label={t.ui.header.workspace}
@@ -342,26 +352,24 @@ export const Header = () => {
       {isStartMenuOpen && (
         <StartMenuModal
           onClose={closeStartMenu}
-          onOpenWorkspace={() => setIsDataModalOpen(true)}
-          onOpenOperators={() => setIsAccountsHitlOpen(true)}
-          onOpenLicense={() => setIsLicenseModalOpen(true)}
-          onOpenLegal={() => {
-            setLegalTab("compliance");
-            setIsLegalModalOpen(true);
-          }}
+          onOpenWorkspace={openDataModal}
+          onOpenOperators={openAccountsHitl}
+          onOpenLicense={openLicenseModal}
+          onOpenOnboarding={openOnboarding}
+          onOpenLegal={() => openLegalModal("compliance")}
         />
       )}
 
       {isAccountsHitlOpen && (
-        <LocalAccountsHitlModal onClose={() => setIsAccountsHitlOpen(false)} />
+        <LocalAccountsHitlModal onClose={closeAccountsHitl} />
       )}
       {isDataModalOpen && (
-        <DataManagementModal onClose={() => setIsDataModalOpen(false)} />
+        <DataManagementModal onClose={closeDataModal} />
       )}
 
       {isLicenseModalOpen && (
         <B2BLicenseManagementModal
-          onClose={() => setIsLicenseModalOpen(false)}
+          onClose={closeLicenseModal}
           onLicenseUpdated={() => reloadPlugins()}
         />
       )}
@@ -372,17 +380,7 @@ export const Header = () => {
           initialTab={commHubConfig.tab}
           initialTemplate={commHubConfig.template}
           onClose={closeCommHub}
-          onOpenPrivacyPolicy={() => {
-            setLegalTab("privacy");
-            setIsLegalModalOpen(true);
-          }}
-        />
-      )}
-
-      {isLegalModalOpen && (
-        <LegalPrivacyModal
-          onClose={() => setIsLegalModalOpen(false)}
-          initialTab={legalTab}
+          onOpenPrivacyPolicy={() => openLegalModal("privacy")}
         />
       )}
 

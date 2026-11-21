@@ -1,5 +1,5 @@
 {
-  "name": "shiftpulse-ledger-pro",
+  "name": "shiftpulse-ledger",
   "private": true,
   "version": "1.0.0",
   "main": "main.js",
@@ -46,8 +46,8 @@
     "typescript": "^7.0.2"
   },
   "build": {
-    "appId": "com.shiftpulse.ledgerpro",
-    "productName": "ShiftPulse Ledger Pro",
+    "appId": "com.shiftpulse.ledger",
+    "productName": "ShiftPulse Ledger",
     "files": [
       "dist/**/*",
       "server/**/*",
