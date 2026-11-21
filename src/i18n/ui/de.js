@@ -494,6 +494,10 @@ export const uiDe = {
     municipalityCodeLabel: "Gemeindecode",
     companyBankLabel: "Bankkonto / IBAN",
     createCompanyBtn: "Mandantenakte erstellen",
+    removeClientBtn: "Mandant entfernen",
+    confirmRemoveClient: "Löschen bestätigen?",
+    clientRemovedNotice: "Mandant \"{{name}}\" aus dem Register entfernt.",
+    emptyRegistry: "Keine Mandanten im Register. Klicken Sie auf '+ Neue Mandantenakte' oder importieren Sie eine JSON-Akte.",
   },
   oglasi: {
     badge: "Personalbedarf & Vermittlungsregister",

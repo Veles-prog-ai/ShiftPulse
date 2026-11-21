@@ -494,6 +494,10 @@ export const uiSr = {
     municipalityCodeLabel: "Šifra opštine",
     companyBankLabel: "Tekući račun",
     createCompanyBtn: "Kreiraj Dosije Klijenta",
+    removeClientBtn: "Ukloni Klijenta",
+    confirmRemoveClient: "Potvrdi uklanjanje?",
+    clientRemovedNotice: "Klijent \"{{name}}\" je uklonjen iz kartoteke.",
+    emptyRegistry: "Nema klijentskih firmi u kartoteci. Kliknite '+ Novi Dosije Klijenta' ili uvezite JSON dosije.",
   },
   oglasi: {
     badge: "Registar Posredovanja i Potražnje",

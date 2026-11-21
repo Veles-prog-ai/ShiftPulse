@@ -56,6 +56,25 @@ export const ClientFilesManagerView = () => {
   const [isAddShiftOpen, setIsAddShiftOpen] = useState(false);
   const [shiftTargetWorkerId, setShiftTargetWorkerId] = useState(void 0);
   const [confirmDeleteWorkerId, setConfirmDeleteWorkerId] = useState(null);
+  const [confirmDeleteCompanyTarget, setConfirmDeleteCompanyTarget] = useState(null);
+  const handleRemoveCompany = (comp) => {
+    if (!comp) return;
+    if (isReadOnlyLocked) {
+      setLicenseActionError({ code: "READ_ONLY_LOCK" });
+      setConfirmDeleteCompanyTarget(null);
+      return;
+    }
+    deleteCompany(comp.id);
+    setConfirmDeleteCompanyTarget(null);
+    if (selectedCompanyId === comp.id) {
+      const nextComp = companies.find((c) => c.id !== comp.id);
+      setSelectedCompanyId(nextComp?.id || "");
+    }
+    setImportStatus(
+      interpolate(t.ui.clients.clientRemovedNotice, { name: comp.naziv }),
+    );
+    setTimeout(() => setImportStatus(null), 3e3);
+  };
   const currentCompany = useMemo(() => {
     return (
       companies.find((c) => c.id === selectedCompanyId) || companies[0] || null
@@ -272,12 +291,20 @@ export const ClientFilesManagerView = () => {
       )}
 
       {/* 2. CLIENT COMPANIES SELECTOR CARDS (HORIZONTALLY SCROLLABLE / GRID) */}
+      {companies.length === 0 ? (
+        <div className="p-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-center text-xs text-slate-500 dark:text-slate-400">
+          {t.ui.clients.emptyRegistry}
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {companies.map((comp) => {
           const isSelected = comp.id === currentCompany?.id;
           const compWorkerCount = employees.filter(
             (e) => e.companyId === comp.id,
           ).length;
+          const isConfirmingCardDelete =
+            confirmDeleteCompanyTarget?.id === comp.id &&
+            confirmDeleteCompanyTarget?.source === "card";
           return (
             <div
               key={comp.id}
@@ -287,26 +314,58 @@ export const ClientFilesManagerView = () => {
               }}
               className={`p-4 rounded-2xl border transition-all cursor-pointer relative ${isSelected ? "bg-gradient-to-br from-indigo-50/80 via-white to-white dark:from-slate-800 dark:via-slate-900 dark:to-slate-900 border-indigo-500 shadow-md ring-2 ring-indigo-500/20" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"}`}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}`}
                   >
                     {comp.naziv.slice(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[180px]">
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 dark:text-white text-sm truncate max-w-[160px]">
                       {comp.naziv}
                     </h3>
-                    <div className="text-[10px] font-mono text-slate-500">
+                    <div className="text-[10px] font-mono text-slate-500 truncate">
                       {t.ui.ledger.slip.pib}: <strong>{comp.pib}</strong> | {t.ui.ledger.slip.mb}: {comp.maticniBroj}
                     </div>
                   </div>
                 </div>
 
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  {interpolate(t.ui.clients.workersCount, { count: compWorkerCount })}
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {interpolate(t.ui.clients.workersCount, { count: compWorkerCount })}
+                  </span>
+                  {isConfirmingCardDelete ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCompany(comp)}
+                        className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        {t.ui.clients.confirmRemoveClient}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteCompanyTarget(null)}
+                        className="px-1.5 py-0.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-bold cursor-pointer"
+                      >
+                        {t.ui.common.cancel}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setConfirmDeleteCompanyTarget({ id: comp.id, source: "card" })
+                      }
+                      title={t.ui.clients.removeClientBtn}
+                      aria-label={t.ui.clients.removeClientBtn}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 flex items-center justify-between">
@@ -321,6 +380,7 @@ export const ClientFilesManagerView = () => {
           );
         })}
       </div>
+      )}
 
       {/* 3. DEDICATED COMPANY DOSSIER VIEW & PERSON ROSTER */}
       {currentCompany && (
@@ -385,6 +445,40 @@ export const ClientFilesManagerView = () => {
                 <span>{t.ui.clients.payrollShortcut}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
+
+              {confirmDeleteCompanyTarget?.id === currentCompany.id &&
+              confirmDeleteCompanyTarget?.source === "banner" ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveCompany(currentCompany)}
+                    className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    {t.ui.clients.confirmRemoveClient}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteCompanyTarget(null)}
+                    className="px-2.5 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold cursor-pointer"
+                  >
+                    {t.ui.common.cancel}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfirmDeleteCompanyTarget({
+                      id: currentCompany.id,
+                      source: "banner",
+                    })
+                  }
+                  className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t.ui.clients.removeClientBtn}</span>
+                </button>
+              )}
             </div>
           </div>
 

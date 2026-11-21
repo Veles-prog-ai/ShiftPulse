@@ -494,6 +494,10 @@ export const uiEn = {
     municipalityCodeLabel: "Municipality Code",
     companyBankLabel: "Company Bank Account / IBAN",
     createCompanyBtn: "Create Client Dossier",
+    removeClientBtn: "Remove Client",
+    confirmRemoveClient: "Confirm Removal?",
+    clientRemovedNotice: "Client \"{{name}}\" removed from registry.",
+    emptyRegistry: "No client companies in registry. Click '+ New Client Dossier' or import a JSON dossier.",
   },
   oglasi: {
     badge: "Client Matchmaking & Placement Registry",
