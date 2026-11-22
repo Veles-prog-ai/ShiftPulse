@@ -1,8 +1,10 @@
 // ShiftPulse Ledger - Offline-First Service Worker
-const CACHE_NAME = 'shiftpulse-core-v2';
+const CACHE_NAME = 'shiftpulse-core-v3';
 const PRECACHE_ASSETS = [
+  '/?app=1',
   '/',
   '/index.html',
+  '/install',
   '/manifest.json',
   '/icon.svg',
   '/pwa-192x192.png',
@@ -63,7 +65,10 @@ self.addEventListener('fetch', (event) => {
         const cached = await caches.match(event.request);
         if (cached) return cached;
         if (event.request.mode === 'navigate') {
-          return caches.match('/');
+          if (url.pathname === '/' && !url.search) {
+            return (await caches.match('/')) || (await caches.match('/?app=1'));
+          }
+          return (await caches.match('/?app=1')) || (await caches.match('/index.html'));
         }
         return new Response('Offline', { status: 503, statusText: 'Offline Mode' });
       })

@@ -446,8 +446,8 @@
       </div>
 
       <div class="footer-actions">
-        <a href="https://veles-lab.com" class="btn-ghost">Back to Website</a>
-        <a href="/" class="btn-launch-web">
+        <a href="/" class="btn-ghost">Back to Website</a>
+        <a href="/?app=1" class="btn-launch-web">
           <span>Open Client Workspace</span>
         </a>
       </div>
@@ -458,12 +458,11 @@
     const inIframe = window.self !== window.top;
     const iframeAlert = document.getElementById('iframeAlert');
     const breakoutLink = document.getElementById('breakoutLink');
-    const CANONICAL_PUBLIC_URL = 'https://veles-lab.com';
-    const effectiveUrl = inIframe ? CANONICAL_PUBLIC_URL : window.location.origin;
+    const effectiveUrl = window.location.origin + '/install';
 
     if (inIframe) {
       iframeAlert.style.display = 'block';
-      breakoutLink.href = CANONICAL_PUBLIC_URL + '/install';
+      breakoutLink.href = '/install';
     }
 
     const shareInput = document.getElementById('shareUrlInput');

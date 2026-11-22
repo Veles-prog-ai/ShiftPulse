@@ -3,7 +3,7 @@
   "name": "ShiftPulse Ledger - Shift Work Calendar & Multi-Job Payroll",
   "short_name": "ShiftPulse Ledger",
   "description": "Mobile shift work calendar with routine and irregular break tracking, overtime calculation, night differentials, and multi-job payroll management.",
-  "start_url": "/",
+  "start_url": "/?app=1",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "window-controls-overlay"],

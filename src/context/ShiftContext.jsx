@@ -493,9 +493,17 @@ export const ShiftProvider = ({ children }) => {
   };
   const [isStartMenuOpen, setIsStartMenuOpen] = useState(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      const isDirectWorkspaceLaunch =
+        params.get("app") === "1" ||
+        window.location.pathname === "/workspace" ||
+        window.location.pathname.startsWith("/workspace/");
+      if (isDirectWorkspaceLaunch) {
+        return false;
+      }
       return localStorage.getItem(START_MENU_PREF_KEY) !== "false";
     } catch {
-      return true;
+      return false;
     }
   });
   const openStartMenu = () => setIsStartMenuOpen(true);

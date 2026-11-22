@@ -1812,8 +1812,9 @@ app.get("/api/gateway/status", async (req, res) => {
     workspacePath: localDesktopActive ? LOCAL_WORKSPACE_ROOT : null,
     offlineCapable: true,
     separatedInterfaces: {
-      clientWorkspace: "/",
-      publicWebsite: "https://veles-lab.com",
+      clientWorkspace: "/?app=1",
+      workspaceRoute: "/workspace",
+      publicWebsite: "/",
       installPortal: "/install",
       adminConsole: "/admin",
     },
@@ -2120,10 +2121,31 @@ async function startServer() {
 
   const distDir = path.resolve(__dirname, "dist");
   const distIndexPath = path.join(distDir, "index.html");
+  const landingFilePath = path.resolve(__dirname, "public", "landing.html");
   const isProduction =
     process.env.NODE_ENV === "production" ||
     (fs.existsSync(distIndexPath) &&
       !fs.existsSync(path.resolve(__dirname, "src", "main.jsx")));
+
+  // Root URL without query parameters serves the public Serbian landing page;
+  // /?app=1 (or any query params like /?tab=...) and /workspace serve the React client workspace.
+  app.get("/", (req, res, next) => {
+    const hasQueryParams = Object.keys(req.query || {}).length > 0;
+    if (!hasQueryParams) {
+      return res.sendFile(landingFilePath);
+    }
+    if (isProduction) {
+      return res.sendFile(distIndexPath);
+    }
+    return next();
+  });
+
+  app.get(["/workspace", "/workspace/*"], (_req, res, next) => {
+    if (isProduction) {
+      return res.sendFile(distIndexPath);
+    }
+    return next();
+  });
 
   if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
@@ -2133,7 +2155,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(distDir));
+    app.use(express.static(distDir, { index: false }));
     app.get("*", (_req, res) => {
       res.sendFile(distIndexPath);
     });
