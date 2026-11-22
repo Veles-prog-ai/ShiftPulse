@@ -45,26 +45,26 @@
       "name": "New Shift",
       "short_name": "Add Shift",
       "description": "Quickly log a new work shift",
-      "url": "/?action=add-shift",
+      "url": "/?app=1&action=add-shift",
       "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
     },
     {
       "name": "Calendar Roster",
       "short_name": "Calendar",
       "description": "View monthly and weekly shift roster",
-      "url": "/?tab=calendar",
+      "url": "/?app=1&tab=calendar",
       "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
     },
     {
       "name": "Payroll Summary",
       "short_name": "Payroll",
       "description": "Calculate multi-job gross and overtime pay",
-      "url": "/?tab=payroll",
+      "url": "/?app=1&tab=payroll",
       "icons": [{ "src": "/icon.svg", "sizes": "96x96" }]
     }
   ],
   "share_target": {
-    "action": "/?action=share",
+    "action": "/?app=1&action=share",
     "method": "GET",
     "params": {
       "title": "title",

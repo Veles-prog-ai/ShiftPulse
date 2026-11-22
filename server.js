@@ -30,6 +30,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://veles-lab.com",
   "https://www.veles-lab.com",
   "https://app.veles-lab.com",
+  "https://shiftpulse.veles-lab.com",
 ];
 
 function getConfiguredAllowedOrigins() {
@@ -2116,28 +2117,19 @@ async function startServer() {
     }),
   );
 
-  // Always serve static assets from public/ (icons, manifests, packages)
-  app.use(express.static(path.resolve(__dirname, "public")));
-
+  const publicDir = path.resolve(__dirname, "public");
   const distDir = path.resolve(__dirname, "dist");
   const distIndexPath = path.join(distDir, "index.html");
-  const landingFilePath = path.resolve(__dirname, "public", "landing.html");
   const isProduction =
     process.env.NODE_ENV === "production" ||
     (fs.existsSync(distIndexPath) &&
       !fs.existsSync(path.resolve(__dirname, "src", "main.jsx")));
 
-  // Root URL without query parameters serves the public Serbian landing page;
-  // /?app=1 (or any query params like /?tab=...) and /workspace serve the React client workspace.
+  // Explicit root route BEFORE express.static, Vite middleware, and catch-all app.get("*"):
+  // Visiting "/" serves public/landing.html; "/?app=1" falls through to the React workspace.
   app.get("/", (req, res, next) => {
-    const hasQueryParams = Object.keys(req.query || {}).length > 0;
-    if (!hasQueryParams) {
-      return res.sendFile(landingFilePath);
-    }
-    if (isProduction) {
-      return res.sendFile(distIndexPath);
-    }
-    return next();
+    if (req.query.app) return next();
+    return res.sendFile(path.join(publicDir, "landing.html"));
   });
 
   app.get(["/workspace", "/workspace/*"], (_req, res, next) => {
@@ -2146,6 +2138,9 @@ async function startServer() {
     }
     return next();
   });
+
+  // Always serve static assets from public/ (icons, manifests, packages)
+  app.use(express.static(publicDir, { index: false }));
 
   if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");

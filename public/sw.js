@@ -1,5 +1,5 @@
 // ShiftPulse Ledger - Offline-First Service Worker
-const CACHE_NAME = 'shiftpulse-core-v3';
+const CACHE_NAME = 'shiftpulse-core-v4';
 const PRECACHE_ASSETS = [
   '/?app=1',
   '/',
@@ -52,8 +52,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const fetchReq = event.request.mode === 'navigate'
+    ? new Request(event.request, { cache: 'no-cache' })
+    : event.request;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(fetchReq)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
           const clone = networkResponse.clone();
