@@ -13,9 +13,6 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ShiftPulse Ledger" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #0b0f19;
@@ -473,6 +470,10 @@
     shareInput.value = effectiveUrl;
 
     const qrImg = document.getElementById('qrImg');
+    qrImg.onerror = function () {
+      const wrap = qrImg.parentElement;
+      if (wrap) wrap.style.display = 'none';
+    };
     qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(effectiveUrl);
 
     function showNotification(message, type = 'info') {

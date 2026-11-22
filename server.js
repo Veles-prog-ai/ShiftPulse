@@ -2080,11 +2080,11 @@ app.post("/api/workspace/save-output", requireLocalDesktop, (req, res) => {
 // ========================================================
 // PUBLIC WEBSITE, INSTALL PORTAL & ADMIN CONSOLE ROUTES
 // ========================================================
-app.get(["/site", "/landing", "/download"], (_req, res) => {
+app.get(["/site", "/landing", "/landing.html", "/download"], (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "landing.html"));
 });
 
-app.get("/install", (_req, res) => {
+app.get(["/install", "/install.html"], (_req, res) => {
   res.sendFile(path.resolve(__dirname, "public", "install.html"));
 });
 

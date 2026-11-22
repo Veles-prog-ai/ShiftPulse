@@ -1,65 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="sr">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ShiftPulse Ledger — Zero-Knowledge Accounting &amp; Payroll System</title>
-  <meta name="description" content="Hybrid Zero-Knowledge accounting, tax, P&amp;L, and payroll software for Windows, Linux, and ChromeOS. Launch v1.0 available exclusively for the Republic of Serbia (RS)." />
+  <title>ShiftPulse Ledger — Lokalni knjigovodstveni softver za agencije u Srbiji</title>
+  <meta name="description" content="Hibridni knjigovodstveni softver za agencije u Srbiji. Radi lokalno i offline, štedi sate ručnog rada i prati svaku izmenu propisa uz proveru stručnjaka — 650 € godišnje." />
   <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg: #f8fafc;
       --surface: #ffffff;
+      --surface-soft: #f1f5f9;
       --border: #e2e8f0;
       --text: #0f172a;
+      --text-soft: #334155;
       --muted: #475569;
-      --accent: #4338ca;
-      --accent-hover: #3730a3;
-      --amber-bg: #fffbeb;
-      --amber-border: #f59e0b;
-      --amber-text: #78350f;
+      --accent: #3730a3;
+      --accent-hover: #312e81;
+      --emerald: #059669;
+      --emerald-bg: #ecfdf5;
+      --emerald-border: #a7f3d0;
+      --dark: #0b1120;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
     body {
       background: var(--bg);
       color: var(--text);
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
     header {
-      border-bottom: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(8px);
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(8px);
     }
     .nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 68px;
+      min-height: 68px;
       gap: 16px;
+      padding: 8px 0;
     }
     .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       font-weight: 800;
-      font-size: 18px;
+      font-size: 17px;
       color: var(--text);
       text-decoration: none;
+      letter-spacing: -0.02em;
     }
     .brand img { width: 34px; height: 34px; border-radius: 9px; }
+    .brand-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid var(--emerald-border);
+    }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 22px;
       font-size: 14px;
       font-weight: 600;
     }
@@ -69,92 +81,120 @@
       transition: color 0.15s;
     }
     .nav-links a:hover { color: var(--text); }
+    .nav-ctas { display: flex; align-items: center; gap: 10px; }
     .btn-primary {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 11px 22px;
+      gap: 8px;
+      padding: 13px 24px;
       background: var(--accent);
       color: #ffffff;
+      border: none;
       border-radius: 10px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 15px;
       text-decoration: none;
-      transition: background 0.15s;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.12s;
     }
-    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
     .btn-secondary {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: 11px 22px;
+      gap: 8px;
+      padding: 13px 22px;
       background: var(--surface);
       color: var(--text);
-      border: 1px solid var(--border);
+      border: 1px solid #cbd5e1;
       border-radius: 10px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 15px;
       text-decoration: none;
-      transition: background 0.15s;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
     }
-    .btn-secondary:hover { background: #f1f5f9; }
+    .btn-secondary:hover { background: var(--surface-soft); border-color: #94a3b8; }
+    .btn-sm { padding: 9px 16px; font-size: 13px; border-radius: 8px; }
+
+    /* HERO */
     .hero {
-      padding: 68px 0 56px;
+      padding: 64px 0 56px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border-bottom: 1px solid var(--border);
     }
-    .kicker {
-      font-size: 13px;
-      font-weight: 700;
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
       color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      margin-bottom: 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 18px;
     }
-    h1 {
-      font-size: clamp(32px, 4.5vw, 52px);
+    .hero h1 {
+      font-size: clamp(28px, 4.2vw, 48px);
       font-weight: 800;
-      line-height: 1.08;
+      line-height: 1.12;
       letter-spacing: -0.025em;
-      max-width: 820px;
+      max-width: 900px;
+      color: var(--text);
       margin-bottom: 20px;
     }
-    .lead {
-      font-size: 18px;
-      color: var(--muted);
-      max-width: 700px;
-      margin-bottom: 24px;
-    }
-    .market-notice {
-      background: var(--amber-bg);
-      border: 1px solid var(--amber-border);
-      border-left: 4px solid var(--amber-border);
-      border-radius: 12px;
-      padding: 14px 18px;
-      margin-bottom: 28px;
+    .hero-sub {
+      font-size: clamp(16px, 1.8vw, 19px);
+      color: var(--text-soft);
       max-width: 780px;
-      color: var(--amber-text);
-      font-size: 14px;
-    }
-    .market-notice strong {
-      display: block;
-      font-size: 14px;
-      margin-bottom: 3px;
-      color: #451a03;
+      margin-bottom: 28px;
     }
     .hero-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       align-items: center;
+      margin-bottom: 22px;
     }
-    .section { padding: 56px 0; border-bottom: 1px solid var(--border); }
-    .section-title {
-      font-size: 26px;
+    .trust-bar {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      border-radius: 10px;
+      color: #065f46;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    /* SECTIONS */
+    .section { padding: 60px 0; border-bottom: 1px solid var(--border); }
+    .section-alt { background: var(--surface); }
+    .section-head { max-width: 720px; margin-bottom: 36px; }
+    .section-kicker {
+      font-size: 12px;
       font-weight: 800;
-      letter-spacing: -0.02em;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent);
       margin-bottom: 8px;
     }
-    .section-sub { color: var(--muted); font-size: 15px; margin-bottom: 32px; max-width: 680px; }
+    .section-title {
+      font-size: clamp(24px, 3vw, 32px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .section-desc { font-size: 15px; color: var(--muted); }
+
     .grid-3 {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -164,43 +204,274 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 24px;
+      padding: 26px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      gap: 16px;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
     }
-    .card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .icon-box {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: #eef2ff;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+    .icon-box.green { background: var(--emerald-bg); color: var(--emerald); }
+    .card h3 { font-size: 18px; font-weight: 800; line-height: 1.3; }
     .card p { font-size: 14px; color: var(--muted); }
-    .mono-meta {
-      font-family: 'JetBrains Mono', monospace;
+    .card-meta {
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 12px;
-      color: var(--muted);
+      color: var(--text-soft);
     }
-    .spec-list {
+
+    /* STEPS */
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--dark);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    /* PRICING */
+    .pricing-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 680px);
+      justify-content: center;
+      gap: 20px;
+    }
+    .price-card {
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 18px 40px -18px rgba(55, 48, 163, 0.25);
+    }
+    .price-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 22px;
+    }
+    .price-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .price-amount {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      color: var(--text);
+    }
+    .price-period { font-size: 14px; font-weight: 600; color: var(--muted); }
+    .price-list {
       list-style: none;
       display: grid;
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px 20px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--text-soft);
+    }
+    .price-list li { display: flex; align-items: flex-start; gap: 8px; }
+    .check { color: var(--emerald); font-weight: 800; flex-shrink: 0; }
+    .enterprise-note {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 12px;
+      padding: 18px 22px;
+      font-size: 14px;
+      color: var(--text-soft);
+    }
+    .enterprise-note strong { color: var(--text); display: block; margin-bottom: 4px; }
+
+    /* DOWNLOAD STRIP */
+    .download-strip {
+      margin-top: 28px;
+      padding: 20px 24px;
+      background: var(--dark);
+      color: #f8fafc;
+      border-radius: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .download-strip p { font-size: 13px; color: #cbd5e1; margin-top: 2px; }
+    .download-links { display: flex; flex-wrap: wrap; gap: 10px; }
+    .dl-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 14px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .dl-pill:hover { background: #334155; }
+
+    /* FAQ ACCORDION */
+    .faq-list {
+      max-width: 820px;
+      display: grid;
+      gap: 12px;
+    }
+    .faq-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .faq-btn {
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      padding: 18px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+    }
+    .faq-btn:hover { background: #f8fafc; }
+    .faq-chevron {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+    .faq-item.open .faq-chevron { transform: rotate(45deg); }
+    .faq-panel {
+      display: none;
+      padding: 0 20px 18px;
       font-size: 14px;
       color: var(--muted);
+      border-top: 1px solid #f1f5f9;
+      padding-top: 14px;
     }
-    .spec-list li::before {
-      content: "— ";
-      color: var(--accent);
-      font-weight: 700;
+    .faq-item.open .faq-panel { display: block; }
+
+    /* DEMO MODAL */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(15, 23, 42, 0.72);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
     }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 480px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+    }
+    .modal-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .modal-close {
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 32px;
+      height: 32px;
+      font-weight: 800;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; color: var(--text-soft); margin-bottom: 4px; }
+    .field input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .demo-status {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      color: #065f46;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
     footer {
-      padding: 32px 0;
+      padding: 36px 0;
+      background: var(--surface);
       font-size: 13px;
       color: var(--muted);
+    }
+    .footer-inner {
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       gap: 16px;
     }
-    @media (max-width: 640px) {
+    .footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
+    .footer-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
+
+    @media (max-width: 760px) {
       .nav-links { display: none; }
+      .hero { padding: 44px 0 40px; }
+      .price-card { padding: 22px; }
     }
   </style>
 </head>
@@ -210,126 +481,347 @@
       <a href="/" class="brand">
         <img src="/icon.svg" alt="ShiftPulse Ledger" />
         <span>ShiftPulse Ledger</span>
+        <span class="brand-tag">Srbija (RS)</span>
       </a>
-      <nav class="nav-links">
-        <a href="#architecture">Architecture</a>
-        <a href="#downloads">Desktop Packages</a>
-        <a href="https://veles-lab.com/install">PWA / Mobile Portal</a>
+      <nav class="nav-links" aria-label="Glavna navigacija">
+        <a href="#prednosti">Prednosti</a>
+        <a href="#kako-radi">Kako radi</a>
+        <a href="#cena">Cena</a>
+        <a href="#faq">Česta pitanja</a>
       </nav>
-      <a href="https://veles-lab.com" class="btn-primary">Open Client Workspace</a>
+      <div class="nav-ctas">
+        <a href="/install.html" class="btn-secondary btn-sm">Instalacioni portal</a>
+        <a href="https://veles-lab.com" class="btn-primary btn-sm">Radna stanica</a>
+      </div>
     </div>
   </header>
 
   <main>
+    <!-- 1. HERO SEKCIJA -->
     <section class="hero">
       <div class="wrap">
-        <div class="kicker">Hybrid Zero-Knowledge Accounting &amp; Payroll Gateway</div>
-        <h1>Your client books never leave your device. The server acts strictly as a gateway.</h1>
-        <p class="lead">
-          Deterministic 0-token analysis of invoices, delivery notes, POS slips, VAT, corporate tax, and shift payroll — paired with encrypted personal cloud backup and Human-in-the-Loop AI governance.
+        <div class="hero-eyebrow">Veles Lab • B2B lokalni softver za računovodstvene agencije u Srbiji</div>
+        <h1>Automatizujte knjigovodstvene provere i praćenje zakona — bez slanja podataka Vaših klijenata na javni cloud.</h1>
+        <p class="hero-sub">
+          Hibridni softver napravljen za knjigovodstvene agencije u Srbiji. Radi lokalno i offline, štedi sate ručnog rada i prati svaku izmenu propisa uz proveru stručnjaka — za fiksnu godišnju cenu od 650 €.
         </p>
-
-        <div class="market-notice">
-          <strong>Launch Availability Notice (v1.0): Republic of Serbia (RS) Only</strong>
-          ShiftPulse Ledger Launch v1.0 is currently available exclusively for businesses and accounting agencies operating in the Republic of Serbia (Labor Law Art. 108, PURS PPP-PD XML, SEF eFaktura UBL, NBS IPS). Regional Balkan &amp; EU country packs (HR, BA, ME, SI, EU) are scheduled for post-launch expansion phases.
-        </div>
 
         <div class="hero-actions">
-          <a href="#downloads" class="btn-primary">Download Desktop Installer</a>
-          <a href="https://veles-lab.com/install" class="btn-secondary">PWA &amp; QR Install Portal</a>
-          <a href="https://veles-lab.com" class="btn-secondary">Launch Workspace</a>
+          <a href="/install.html" class="btn-primary">Započnite 14 dana besplatnog testiranja</a>
+          <button type="button" class="btn-secondary" id="openDemoBtn">Zakažite 15-minutni prikaz uživo</button>
+        </div>
+
+        <div class="trust-bar">
+          Bez kreditne kartice • Svi finansijski podaci ostaju na Vašem računaru • Instalacija za 5 minuta (Windows / Linux / ChromeOS)
         </div>
       </div>
     </section>
 
-    <section id="architecture" class="section">
+    <!-- 2. TRI KLJUČNA STUBA VREDNOSTI -->
+    <section id="prednosti" class="section section-alt">
       <div class="wrap">
-        <h2 class="section-title">Three-tier privacy-first architecture</h2>
-        <p class="section-sub">
-          The accounting workspace is strictly isolated from public marketing pages and licensing administration, keeping client records under your physical custody.
-        </p>
+        <div class="section-head">
+          <div class="section-kicker">Zašto knjigovodstvene agencije prelaze na ShiftPulse Ledger</div>
+          <h2 class="section-title">Brzina automatizacije, uz potpunu pravnu i bezbednosnu kontrolu</h2>
+          <p class="section-desc">
+            Kombinujemo determinističke lokalne obračune za srpsko tržište sa nadzorom zakona gde svaku promenu potvrđuje ovlašćeni stručnjak.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <div>
+              <div class="icon-box green">01</div>
+              <h3>100% zaštita osetljivih podataka (Zero-Data-Exposure)</h3>
+              <p>
+                Svi računi, PIB/JMBG podaci, plate i ugovori klijenata čuvaju se isključivo na Vašem uređaju ili u Vašoj šifrovanoj AES-256-GCM arhivi. Nijedan finansijski dokument ne napušta agenciju.
+              </p>
+            </div>
+            <div class="card-meta">Lokalni folder ShiftPulse_Workspace • AES-256-GCM enkripcija</div>
+          </article>
+
+          <article class="card">
+            <div>
+              <div class="icon-box">02</div>
+              <h3>Deterministički engine — bez AI nagađanja i radi i offline</h3>
+              <p>
+                Obrada SEF eFaktura (UBL XML), provera PIB-a po Mod-11 algoritmu, PDV razgraničenje, kontiranje i PPP-PD XML obračun zarada izvršavaju se matematički precizno bez zavisnosti od interneta.
+              </p>
+            </div>
+            <div class="card-meta">0 tokena • 100% ponovljivi rezultati bez halucinacija</div>
+          </article>
+
+          <article class="card">
+            <div>
+              <div class="icon-box green">03</div>
+              <h3>Praćenje zakona uz proveru stručnjaka (Human-in-the-Loop)</h3>
+              <p>
+                Sistem prati izmene Službenog glasnika, Poreske uprave i SEF propisa u Srbiji, a svaku promenu pravila verifikuje ovlašćeni stručnjak pre nego što se primeni u Vašem obračunu.
+              </p>
+            </div>
+            <div class="card-meta">RS Country Pack • Human-in-the-Loop revizija i audit trag</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. TOK RADA U 3 KORAKA -->
+    <section id="kako-radi" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="section-kicker">Jednostavno uvođenje bez prekida posla</div>
+          <h2 class="section-title">Od preuzimanja do prvog obračuna u 3 koraka</h2>
+          <p class="section-desc">
+            Nema komplikovane migracije servera niti učenja kompleksnih ERP interfejsa — spremno za rad za 5 minuta.
+          </p>
+        </div>
+
         <div class="grid-3">
           <div class="card">
             <div>
-              <h3>01. Local Workstation Folders</h3>
-              <p>Installation automatically provisions <code class="mono-meta">ShiftPulse_Workspace</code> (<code class="mono-meta">01_Ulaz_Dokumenta</code> and <code class="mono-meta">02_Izlaz_Dokumenta</code>) for offline operation and self-managed AES-256-GCM cloud backups.</p>
+              <div class="step-num">1</div>
+              <h3>Preuzmete i pokrenete lokalno (5 min)</h3>
+              <p>
+                Izaberete instalacioni paket za Windows, Linux ili ChromeOS na instalacionom portalu. Skripta automatski priprema šifrovani lokalni radni prostor na Vašem računaru.
+              </p>
             </div>
-            <div class="mono-meta">Zero-Knowledge · Zero payroll or tax data stored on cloud servers</div>
+            <div class="card-meta">Windows (.zip) • Linux (.tar.gz) • ChromeOS / PWA</div>
           </div>
 
           <div class="card">
             <div>
-              <h3>02. Zero-Token Analytical Automaton</h3>
-              <p>SEF UBL XML invoices, bank CSV statements, delivery notes, and POS receipts are parsed locally with deterministic VAT reconciliation and Serbian chart of accounts (Class 5 &amp; 6) classification.</p>
+              <div class="step-num">2</div>
+              <h3>Testirate 14 dana na realnom poslu</h3>
+              <p>
+                Uključite 14-dnevni probni period direktno u aplikaciji, uvezete probni SEF XML ili platni spisak i proverite obračune zarada, virmane i bilanse bez ikakvih ograničenja kvaliteta.
+              </p>
             </div>
-            <div class="mono-meta">0 AI Tokens · Deterministic PIB Mod-11 &amp; Balance Validation</div>
+            <div class="card-meta">TRIAL_14D • Bez kreditne kartice • Svi fajlovi ostaju čitljivi</div>
           </div>
 
           <div class="card">
             <div>
-              <h3>03. HITL Operators &amp; Regulatory Watch</h3>
-              <p>Local operator accounts enforce Human-in-the-Loop approval before accepting AI suggestions. Only the operator approval decision and token count are audited, while the gateway monitors statutory law changes.</p>
+              <div class="step-num">3</div>
+              <h3>Nastavljate po fiksnoj ceni bez iznenađenja</h3>
+              <p>
+                Kada potvrdite uštedu vremena, aktivirate godišnji licencni ključ jednim klikom — sve već unete firme, radnici i dokumenti nastavljaju da rade bez ponovnog unosa.
+              </p>
             </div>
-            <div class="mono-meta">Minimal Token Consumption · Local Pre-Filter &amp; SHA-256 Cache</div>
+            <div class="card-meta">Fiksna cena 650 € godišnje • Bez skrivenih troškova</div>
+          </div>
+        </div>
+
+        <div class="download-strip">
+          <div>
+            <strong>Direktni instalacioni paketi (podržavaju offline rad):</strong>
+            <p>Preuzmite odmah ili otvorite kompletan instalacioni portal za QR i PWA podešavanje.</p>
+          </div>
+          <div class="download-links">
+            <a href="/api/packages/download/windows" class="dl-pill">Windows (.zip)</a>
+            <a href="/api/packages/download/linux" class="dl-pill">Linux (.tar.gz)</a>
+            <a href="/api/packages/download/chromeos" class="dl-pill">ChromeOS (.zip)</a>
+            <a href="/install.html" class="dl-pill" style="background: #3730a3; border-color: #4f46e5;">Svi detalji (/install.html)</a>
           </div>
         </div>
       </div>
     </section>
 
-    <section id="downloads" class="section">
+    <!-- 4. TRANSPARENTNA CENA -->
+    <section id="cena" class="section section-alt">
       <div class="wrap">
-        <h2 class="section-title">Download Commercial Workstation Packages (v1.0 — Serbia RS)</h2>
-        <p class="section-sub">
-          Select your operating system. Every installer builds your local folder tree automatically and works offline once installed.
-        </p>
+        <div class="section-head" style="margin-left: auto; margin-right: auto; text-align: center;">
+          <div class="section-kicker">Transparentno B2B licenciranje</div>
+          <h2 class="section-title">Jedna jasna cena za knjigovodstvenu agenciju</h2>
+          <p class="section-desc" style="margin: 0 auto;">
+            Bez naplate po tokenu, bez nepredvidivih mesečnih dodataka i bez zaključavanja Vaših knjigovodstvenih datoteka.
+          </p>
+        </div>
 
-        <div class="grid-3">
-          <div class="card">
-            <div>
-              <h3>Windows (Primary Platform)</h3>
-              <p>Windows 10, Windows 11, and Windows Server. Includes automated setup script, Desktop shortcut, and local desktop gateway runtime.</p>
+        <div class="pricing-wrap">
+          <div class="price-card">
+            <div class="price-top">
+              <div>
+                <span class="price-badge">Standardna Agencijska Licenca (MID_MARKET_ANNUAL)</span>
+                <h3 style="font-size: 22px; font-weight: 800;">Kompletan paket za agencije u Srbiji</h3>
+              </div>
+              <div style="text-align: right;">
+                <div class="price-amount">650 € <span class="price-period">/ godišnje</span></div>
+                <div class="price-period">~54 € mesečno • fiksno</div>
+              </div>
             </div>
-            <ul class="spec-list">
-              <li>Provisions <code class="mono-meta">Documents\ShiftPulse_Workspace</code></li>
-              <li>Offline P&amp;L scanner, NBS IPS orders &amp; PPP-PD XML</li>
+
+            <ul class="price-list">
+              <li><span class="check">✓</span><span>Do 25 klijentskih firmi i do 5 operaterskih naloga (proširivo)</span></li>
+              <li><span class="check">✓</span><span>Deterministički obračun zarada i PPP-PD XML izvoz</span></li>
+              <li><span class="check">✓</span><span>SEF eFaktura XML i P&amp;L analiza dokumenata (0 tokena)</span></li>
+              <li><span class="check">✓</span><span>NBS IPS &amp; Halcom bankarski nalozi za prenos (Model 97)</span></li>
+              <li><span class="check">✓</span><span>Lokalno AES-256-GCM šifrovanje i offline radna stanica</span></li>
+              <li><span class="check">✓</span><span>RS Country Pack + stručna HITL verifikacija zakonskih izmena</span></li>
             </ul>
-            <a href="https://veles-lab.com/api/packages/download/windows" class="btn-primary">Download for Windows (.zip)</a>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+              <a href="/install.html" class="btn-primary">Započnite 14 dana besplatnog testiranja</a>
+              <button type="button" class="btn-secondary" id="openDemoBtnPricing">Zakažite 15-minutni prikaz uživo</button>
+            </div>
           </div>
 
-          <div class="card">
-            <div>
-              <h3>Linux Desktop</h3>
-              <p>Ubuntu, Debian, Fedora, and Arch Linux. Includes <code class="mono-meta">install-linux.sh</code> and FreeDesktop application menu integration.</p>
+          <div class="enterprise-note">
+            <strong>Velike agencije (&gt;15 zaposlenih) ili prilagođeni ERP sistemi?</strong>
+            Dostupna je <strong>Enterprise trajna licenca sa BYO-API povezivanjem</strong> (<em>ENTERPRISE_PERPETUAL_BYO_API</em>): trajno pravo korišćenja determinističkog jezgra (bez isteka osnovne licence), lokalno povezivanje sopstvenih AI ključeva/endpointa i 20% godišnji SLA ugovor za praćenje izmena propisa.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. FAQ HARMONIKA -->
+    <section id="faq" class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="section-kicker">Česta pitanja knjigovođa</div>
+          <h2 class="section-title">Sve što je važno pre početka testiranja</h2>
+        </div>
+
+        <div class="faq-list" id="faqList">
+          <div class="faq-item open">
+            <button type="button" class="faq-btn" aria-expanded="true">
+              <span>Da li finansijski podaci mojih klijenata ikada napuštaju moj računar?</span>
+              <span class="faq-chevron">+</span>
+            </button>
+            <div class="faq-panel">
+              Ne. ShiftPulse Ledger je projektovan po principu <strong>Zero-Data-Exposure</strong>: sve fakture, obračuni zarada, JMBG/PIB brojevi i ugovori ostaju isključivo u Vašem lokalnom šifrovanom prostoru (AES-256-GCM). Server obrađuje samo minimalne anonimizovane tehničke meta-podatke (ID klijenta / ID operatera / AI akcija / odluka operatera) radi validacije licence i HITL revizije.
             </div>
-            <ul class="spec-list">
-              <li>Provisions <code class="mono-meta">~/ShiftPulse_Workspace</code></li>
-              <li>Full offline &amp; gateway workstation execution</li>
-            </ul>
-            <a href="https://veles-lab.com/api/packages/download/linux" class="btn-secondary">Download for Linux (.tar.gz)</a>
           </div>
 
-          <div class="card">
-            <div>
-              <h3>ChromeOS &amp; Chromebook</h3>
-              <p>Crostini Linux container bundle or direct 1-click PWA Shelf installation via the dedicated install portal.</p>
+          <div class="faq-item">
+            <button type="button" class="faq-btn" aria-expanded="false">
+              <span>Šta se dešava ako agencija privremeno ostane bez interneta?</span>
+              <span class="faq-chevron">+</span>
+            </button>
+            <div class="faq-panel">
+              Deterministički računovodstveni modul radi 100% offline. Možete neometano obračunavati plate, generisati PPP-PD XML fajlove, parsirati domaće SEF fakture i pripremati NBS IPS virmane čak i kada je internet veza u prekidu.
             </div>
-            <ul class="spec-list">
-              <li>Supports ChromeOS &amp; ChromeOS Flex</li>
-              <li>Service Worker offline cache with local persistence</li>
-            </ul>
-            <a href="https://veles-lab.com/api/packages/download/chromeos" class="btn-secondary">Download for ChromeOS (.zip)</a>
+          </div>
+
+          <div class="faq-item">
+            <button type="button" class="faq-btn" aria-expanded="false">
+              <span>Šta se dešava sa mojim podacima nakon isteka 14-dnevnog probnog perioda?</span>
+              <span class="faq-chevron">+</span>
+            </button>
+            <div class="faq-panel">
+              Nikada ne gubite podatke. Po isteku 14 dana aktivira se automatski režim samo za čitanje (<em>Read-Only Lock</em>): unos novih zapisa i komercijalni izvozi su privremeno zaključani dok ne unesete licencni ključ, dok svi lokalni podaci i fajlovi klijenata ostaju u potpunosti čitljivi.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <button type="button" class="faq-btn" aria-expanded="false">
+              <span>Da li postoji ugovorna obaveza ili skriveni troškovi kod godišnje obnove?</span>
+              <span class="faq-chevron">+</span>
+            </button>
+            <div class="faq-panel">
+              Ne. Standardna agencijska licenca iznosi fiksno 650 € godišnje bez automatskog zaduživanja kartice i bez dugoročnog zaključavanja. Svoju bazu klijenata možete u svakom trenutku izvesti u standardnom JSON ili šifrovanom <code>.spbak</code> formatu.
+            </div>
           </div>
         </div>
       </div>
     </section>
   </main>
 
-  <footer class="wrap">
-    <div>ShiftPulse Ledger v1.0 (Republic of Serbia Edition) · Zero-Knowledge Hybrid Gateway</div>
-    <div style="display: flex; gap: 20px;">
-      <a href="https://veles-lab.com/install" style="color: var(--accent); text-decoration: none; font-weight: 600;">Install Portal</a>
-      <a href="https://veles-lab.com" style="color: var(--accent); text-decoration: none; font-weight: 600;">Client Workspace</a>
+  <footer>
+    <div class="wrap footer-inner">
+      <div>© 2026 Veles Lab · ShiftPulse Ledger (Srbija RS) · Zero-Data-Exposure lokalni softver</div>
+      <div class="footer-links">
+        <a href="/install.html">Instalacioni portal</a>
+        <a href="https://veles-lab.com">Otvori radnu stanicu</a>
+        <a href="mailto:kontakt@veles-lab.com">kontakt@veles-lab.com</a>
+      </div>
     </div>
   </footer>
+
+  <!-- DEMO MODAL (ZERO EXTERNAL DEPENDENCIES) -->
+  <div class="modal-backdrop" id="demoModal" role="dialog" aria-modal="true" aria-labelledby="demoModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 id="demoModalTitle" style="font-size: 18px; font-weight: 800;">Zakažite 15-minutni prikaz uživo</h3>
+          <p style="font-size: 13px; color: var(--muted); margin-top: 2px;">Kratka demonstracija za knjigovodstvene agencije u Srbiji.</p>
+        </div>
+        <button type="button" class="modal-close" id="closeDemoBtn" aria-label="Zatvori">×</button>
+      </div>
+      <form id="demoForm">
+        <div class="field">
+          <label for="demoAgency">Naziv agencije</label>
+          <input id="demoAgency" type="text" placeholder="npr. Konto Plus d.o.o." required />
+        </div>
+        <div class="field">
+          <label for="demoEmail">Vaš poslovni email ili telefon</label>
+          <input id="demoEmail" type="text" placeholder="ime@agencija.rs / 06x ..." required />
+        </div>
+        <button type="submit" class="btn-primary" style="width: 100%;">Pripremi zahtev za prikaz (email)</button>
+      </form>
+      <div class="demo-status" id="demoStatus">
+        Email klijent je otvoren sa pripremljenim zahtevom. Takođe nam možete pisati direktno na <strong>kontakt@veles-lab.com</strong>.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // FAQ Accordion
+      var faqItems = document.querySelectorAll('#faqList .faq-item');
+      faqItems.forEach(function (item) {
+        var btn = item.querySelector('.faq-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var isOpen = item.classList.contains('open');
+          faqItems.forEach(function (other) {
+            other.classList.remove('open');
+            var b = other.querySelector('.faq-btn');
+            if (b) b.setAttribute('aria-expanded', 'false');
+          });
+          if (!isOpen) {
+            item.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+          }
+        });
+      });
+
+      // Live Demo Request Modal
+      var modal = document.getElementById('demoModal');
+      var closeBtn = document.getElementById('closeDemoBtn');
+      var openTriggers = [
+        document.getElementById('openDemoBtn'),
+        document.getElementById('openDemoBtnPricing')
+      ];
+      openTriggers.forEach(function (el) {
+        if (el) {
+          el.addEventListener('click', function () {
+            modal.classList.add('open');
+          });
+        }
+      });
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function () {
+          modal.classList.remove('open');
+        });
+      }
+      modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.classList.remove('open');
+      });
+
+      var demoForm = document.getElementById('demoForm');
+      var demoStatus = document.getElementById('demoStatus');
+      if (demoForm) {
+        demoForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var agency = (document.getElementById('demoAgency').value || '').trim();
+          var contact = (document.getElementById('demoEmail').value || '').trim();
+          var subject = encodeURIComponent('ShiftPulse Ledger — Zakazivanje 15-min prikaza (' + agency + ')');
+          var body = encodeURIComponent('Poštovani,\n\nŽelimo 15-minutni prikaz uživo za agenciju: ' + agency + '\nKontakt: ' + contact + '\n\nHvala!');
+          window.location.href = 'mailto:kontakt@veles-lab.com?subject=' + subject + '&body=' + body;
+          demoStatus.style.display = 'block';
+        });
+      }
+    })();
+  </script>
 </body>
 </html>

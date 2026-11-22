@@ -20,6 +20,7 @@ DIST_DIR = os.path.join(ROOT_DIR, 'dist')
 
 SERVER_MODULES_DIR = os.path.join(ROOT_DIR, 'server')
 PLUGINS_DIR = os.path.join(ROOT_DIR, 'plugins')
+COUNTRY_PACKS_DIR = os.path.join(ROOT_DIR, 'countryPacks')
 
 os.makedirs(PUBLIC_DOWNLOADS, exist_ok=True)
 
@@ -30,6 +31,8 @@ subprocess.run(["npm", "run", "build"], cwd=ROOT_DIR, check=True)
 COMMON_CORE_FILES = [
     'server.js',
     'legalMonitorEngine.js',
+    'legal_monitor_state.example.json',
+    'TERMS_OF_SERVICE_USLOVI_KORISCENJA.md',
     'package.json',
     'main.js',
     'sys_metadata.json'
@@ -64,12 +67,13 @@ def build_windows_package():
             full = os.path.join(ROOT_DIR, cf)
             if os.path.exists(full):
                 zf.write(full, cf)
-        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'install.html', 'landing.html', 'admin.html']:
+        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'sw.js', 'install.html', 'landing.html', 'admin.html']:
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 zf.write(p, f'public/{asset}')
         add_dir_to_zip(zf, SERVER_MODULES_DIR, 'server')
         add_dir_to_zip(zf, PLUGINS_DIR, 'plugins')
+        add_dir_to_zip(zf, COUNTRY_PACKS_DIR, 'countryPacks')
         add_dir_to_zip(zf, DIST_DIR, 'dist')
     print(f"[OK] Windows package created ({os.path.getsize(target_zip)} bytes)")
 
@@ -84,12 +88,13 @@ def build_linux_package():
             full = os.path.join(ROOT_DIR, cf)
             if os.path.exists(full):
                 tf.add(full, arcname=cf)
-        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'install.html', 'landing.html', 'admin.html']:
+        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'sw.js', 'install.html', 'landing.html', 'admin.html']:
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 tf.add(p, arcname=f'public/{asset}')
         add_dir_to_tar(tf, SERVER_MODULES_DIR, 'server')
         add_dir_to_tar(tf, PLUGINS_DIR, 'plugins')
+        add_dir_to_tar(tf, COUNTRY_PACKS_DIR, 'countryPacks')
         add_dir_to_tar(tf, DIST_DIR, 'dist')
     print(f"[OK] Linux package created ({os.path.getsize(target_tar)} bytes)")
 
@@ -104,12 +109,13 @@ def build_chromeos_package():
             full = os.path.join(ROOT_DIR, cf)
             if os.path.exists(full):
                 zf.write(full, cf)
-        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'install.html', 'landing.html', 'admin.html']:
+        for asset in ['icon.svg', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'manifest.json', 'sw.js', 'install.html', 'landing.html', 'admin.html']:
             p = os.path.join(ROOT_DIR, 'public', asset)
             if os.path.exists(p):
                 zf.write(p, f'public/{asset}')
         add_dir_to_zip(zf, SERVER_MODULES_DIR, 'server')
         add_dir_to_zip(zf, PLUGINS_DIR, 'plugins')
+        add_dir_to_zip(zf, COUNTRY_PACKS_DIR, 'countryPacks')
         add_dir_to_zip(zf, DIST_DIR, 'dist')
     print(f"[OK] ChromeOS package created ({os.path.getsize(target_zip)} bytes)")
 
