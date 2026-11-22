@@ -2083,10 +2083,12 @@ app.post("/api/workspace/save-output", requireLocalDesktop, (req, res) => {
 // PUBLIC WEBSITE, INSTALL PORTAL & ADMIN CONSOLE ROUTES
 // ========================================================
 app.get(["/site", "/landing", "/landing.html", "/download"], (_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.sendFile(path.resolve(__dirname, "public", "landing.html"));
 });
 
 app.get(["/install", "/install.html"], (_req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   res.sendFile(path.resolve(__dirname, "public", "install.html"));
 });
 
@@ -2129,6 +2131,7 @@ async function startServer() {
   // Visiting "/" serves public/landing.html; "/?app=1" falls through to the React workspace.
   app.get("/", (req, res, next) => {
     if (req.query.app) return next();
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     return res.sendFile(path.join(publicDir, "landing.html"));
   });
 
@@ -2137,6 +2140,13 @@ async function startServer() {
       return res.sendFile(distIndexPath);
     }
     return next();
+  });
+
+  // Ensure browsers always re-validate the Service Worker script immediately
+  app.get("/sw.js", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Service-Worker-Allowed", "/");
+    return res.sendFile(path.join(publicDir, "sw.js"));
   });
 
   // Always serve static assets from public/ (icons, manifests, packages)

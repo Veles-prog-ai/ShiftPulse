@@ -1,5 +1,5 @@
 // ShiftPulse Ledger - Offline-First Service Worker
-const CACHE_NAME = 'shiftpulse-core-v4';
+const CACHE_NAME = 'shiftpulse-core-v5';
 const PRECACHE_ASSETS = [
   '/?app=1',
   '/',
@@ -14,7 +14,17 @@ const PRECACHE_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        PRECACHE_ASSETS.map((assetUrl) =>
+          fetch(new Request(assetUrl, { cache: 'reload' })).then((res) => {
+            if (res && res.ok) {
+              return cache.put(assetUrl, res.clone());
+            }
+          }).catch(() => {})
+        )
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 
