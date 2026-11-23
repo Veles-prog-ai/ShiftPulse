@@ -299,7 +299,7 @@
         <img src="/icon.svg" alt="ShiftPulse Ledger" />
         <div>
           <div class="brand-title">ShiftPulse Ledger — Admin Konzola</div>
-          <div class="brand-sub">Direktna komunikacija sa serverom • Zero-Knowledge nadzor (bez pristupa podacima klijenata)</div>
+          <div class="brand-sub">Direktna komunikacija sa serverom • Zero-Knowledge nadzor (bez pristupa podacima klijenata) • Kontakt: <a href="mailto:info@veles-lab.com" style="color:#818cf8;text-decoration:none;">info@veles-lab.com</a></div>
         </div>
       </div>
       <div class="top-actions">
@@ -403,6 +403,14 @@
             <div class="field" id="lic-host-wrap" style="display:none;">
               <label for="lic-bound-host">Vezani domen (opciono za TRIAL_14D)</label>
               <input id="lic-bound-host" class="mono" type="text" placeholder="npr. localhost:3000" />
+            </div>
+            <div class="field">
+              <label for="lic-ref-code">Partnerski kod za popust (opciono)</label>
+              <input id="lic-ref-code" class="mono" type="text" placeholder="npr. VELES-7K9P" />
+            </div>
+            <div class="field">
+              <label for="lic-ref-discount">Primenjeni referral popust za obnovu (%)</label>
+              <input id="lic-ref-discount" class="mono" type="number" min="0" max="50" value="0" />
             </div>
             <div class="field full">
               <label for="lic-output">Generisani kriptografski ključ</label>
@@ -667,6 +675,62 @@
         </div>
       </div>
     </div>
+
+    <!-- Referral Program Panel -->
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <div class="panel-title">6. Referral Program (Kumulativni Partnerski Popusti)</div>
+          <div class="panel-sub">Praćenje VELES-XXXX kodova, potvrda uplate preporučenih agencija i primena popusta pri obnovi</div>
+        </div>
+        <div class="btn-row" style="margin-top:0">
+          <span class="tag tag-ok mono" id="ref-config-pill">10 preporuka = 10% • Max 50%</span>
+          <button class="primary" onclick="fetchReferrals()">Osveži Referral Listu</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="form-grid" style="margin-bottom:14px;">
+          <div class="field">
+            <label for="ref-select-partner">Partnerski kod (VELES-XXXX)</label>
+            <select id="ref-select-partner" class="mono"></select>
+          </div>
+          <div class="field">
+            <label for="ref-new-agency">Naziv preporučene agencije (uplata potvrđena)</label>
+            <input id="ref-new-agency" type="text" placeholder="npr. Bilans Tim d.o.o." />
+          </div>
+          <div class="field">
+            <label for="ref-new-pib">PIB preporučene agencije</label>
+            <input id="ref-new-pib" class="mono" type="text" placeholder="108765432" maxlength="13" />
+          </div>
+          <div class="field">
+            <label for="ref-new-note">Napomena / Broj uplate ili fakture</label>
+            <input id="ref-new-note" type="text" placeholder="npr. Izvod 114 / Godišnja licenca plaćena" />
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:0">
+          <button class="ok" onclick="submitManualPaidReferral()">Evidentiraj &amp; Potvrdi Plaćenu Preporuku (+1)</button>
+        </div>
+        <div id="ref-admin-notice" class="notice"></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Partnerski Kod &amp; Link</th>
+                <th>Agencija Partner</th>
+                <th>Plaćene Preporuke / Napredak</th>
+                <th>Ostvareni Popust</th>
+                <th>Preporučene Agencije (Pending &amp; Potvrđene)</th>
+                <th>Akcija</th>
+              </tr>
+            </thead>
+            <tbody id="referrals-table-body">
+              <tr><td colspan="6" style="color:var(--muted)">Učitavanje partnerskih referral kodova...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -870,6 +934,8 @@
       const law_tracker_sla_expiry = document.getElementById("lic-sla-exp").value;
       const boundFingerprint = document.getElementById("lic-bound-fp").value.trim() || null;
       const boundHost = document.getElementById("lic-bound-host").value.trim() || null;
+      const appliedReferralCode = (document.getElementById("lic-ref-code")?.value || "").trim().toUpperCase() || null;
+      const appliedDiscountPercent = Number(document.getElementById("lic-ref-discount")?.value || 0);
 
       if (!nazivAgencije || !pibAgencije) {
         showNotice("lic-gen-notice", "bad", "Unesite naziv agencije i PIB.");
@@ -894,6 +960,8 @@
             law_tracker_sla_expiry: licenseType === "ENTERPRISE_PERPETUAL_BYO_API" ? law_tracker_sla_expiry : datumIsteka,
             boundFingerprint,
             boundHost,
+            appliedReferralCode,
+            appliedDiscountPercent,
           }),
         });
         const data = await res.json();
@@ -1355,11 +1423,201 @@
       }
     }
 
+    let cachedReferrals = [];
+
+    async function fetchReferrals() {
+      try {
+        const res = await adminFetch("/api/admin/referrals");
+        if (res.status === 401) return;
+        const data = await res.json();
+        cachedReferrals = data.partners || [];
+        const cfg = data.config || {};
+        const pill = document.getElementById("ref-config-pill");
+        if (pill) {
+          pill.textContent = `${cfg.referralsPerDiscountStep || 10} preporuka = ${cfg.discountPerStepPercent || 10}% • Max ${cfg.maxStackableDiscountPercent || 50}%`;
+        }
+
+        const sel = document.getElementById("ref-select-partner");
+        if (sel) {
+          const prev = sel.value;
+          sel.innerHTML =
+            cachedReferrals.length === 0
+              ? '<option value="">Nema aktivnih partnera</option>'
+              : cachedReferrals
+                  .map(
+                    (p) =>
+                      `<option value="${esc(p.referralCode)}">${esc(p.referralCode)} — ${esc(p.agencyName)} (${esc(p.earnedRenewalDiscountPercent)}% popust)</option>`
+                  )
+                  .join("");
+          if (prev && cachedReferrals.some((p) => p.referralCode === prev)) {
+            sel.value = prev;
+          }
+        }
+
+        const tbody = document.getElementById("referrals-table-body");
+        if (!tbody) return;
+        if (cachedReferrals.length === 0) {
+          tbody.innerHTML =
+            '<tr><td colspan="6" style="color:var(--muted)">Partnerski kodovi se automatski generišu kada izdate ili aktivirate MID_MARKET_ANNUAL ili ENTERPRISE_PERPETUAL_BYO_API licencu.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedReferrals
+          .map((p) => {
+            const list = Array.isArray(p.referredAgencies) ? p.referredAgencies : [];
+            const agencyRowsHtml =
+              list.length === 0
+                ? '<span style="color:var(--muted);font-size:11px;">Nema zabeleženih preporuka</span>'
+                : list
+                    .map((entry) => {
+                      const isPaid = entry.status === "paid_confirmed";
+                      const badge = isPaid
+                        ? '<span class="tag tag-ok">PLAĆENO</span>'
+                        : '<span class="tag tag-warn">NA ČEKANJU</span>';
+                      const actionBtn = isPaid
+                        ? `<button type="button" style="padding:3px 7px;font-size:10px;" onclick="revokePaidAttribution('${esc(p.referralCode)}','${esc(entry.id)}')">Poništi</button>`
+                        : `<button type="button" class="ok" style="padding:3px 7px;font-size:10px;" onclick="confirmPaidAttribution('${esc(p.referralCode)}','${esc(entry.id)}')">Potvrdi uplatu (+1)</button>`;
+                      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px solid #1e293b;">
+                        <div style="font-size:11px;">
+                          <strong>${esc(entry.agencyName)}</strong> <span class="mono" style="color:var(--muted)">(${esc(entry.agencyPib || "-")})</span>
+                          <div style="font-size:10px;color:var(--muted)">${esc(entry.source || "")}${entry.note ? " • " + esc(entry.note) : ""}</div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:5px;shrink:0;">
+                          ${badge}
+                          ${actionBtn}
+                        </div>
+                      </div>`;
+                    })
+                    .join("");
+
+            return `<tr>
+              <td class="mono">
+                <strong>${esc(p.referralCode)}</strong>
+                <div style="font-size:10px;color:var(--muted);word-break:break-all;">${esc(p.shareUrl)}</div>
+              </td>
+              <td>
+                <strong>${esc(p.agencyName)}</strong>
+                <div class="mono" style="font-size:10px;color:var(--muted)">PIB: ${esc(p.agencyPib || "-")} • ${esc(p.licenseType)}</div>
+              </td>
+              <td class="mono">
+                <strong>${esc(p.successfulPaidReferrals)}</strong> plaćenih
+                <div style="font-size:10px;color:var(--muted)">Napredak: ${esc(p.progressTowardNextStep)} / ${esc(p.referralsPerStep)} • Na čekanju: ${esc(p.pendingCount)}</div>
+              </td>
+              <td>
+                <span class="tag ${p.earnedRenewalDiscountPercent > 0 ? "tag-ok" : "tag-muted"} mono">${esc(p.earnedRenewalDiscountPercent)}%</span>
+              </td>
+              <td>${agencyRowsHtml}</td>
+              <td>
+                <button type="button" onclick="applyPartnerDiscountToGenerator('${esc(p.referralCode)}')">Primeni u Generator</button>
+              </td>
+            </tr>`;
+          })
+          .join("");
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function applyPartnerDiscountToGenerator(referralCode) {
+      const partner = cachedReferrals.find((p) => p.referralCode === referralCode);
+      if (!partner) return;
+      document.getElementById("lic-type").value = partner.licenseType || "MID_MARKET_ANNUAL";
+      onLicenseTypeChange();
+      document.getElementById("lic-agency").value = partner.agencyName || "";
+      document.getElementById("lic-pib").value = partner.agencyPib || "";
+      document.getElementById("lic-ref-code").value = partner.referralCode || "";
+      document.getElementById("lic-ref-discount").value = String(partner.earnedRenewalDiscountPercent || 0);
+      showNotice(
+        "lic-gen-notice",
+        "ok",
+        `Učitan partner <strong>${esc(partner.agencyName)}</strong> (${esc(partner.referralCode)}) sa ostvarenim popustom za obnovu od <strong>${esc(partner.earnedRenewalDiscountPercent)}%</strong>.`
+      );
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    async function confirmPaidAttribution(referralCode, attributionId) {
+      try {
+        const res = await adminFetch("/api/admin/referrals/mark-paid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referralCode, attributionId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotice(
+            "ref-admin-notice",
+            "ok",
+            `Potvrđena uplata za preporuku pod kodom <span class="mono">${esc(referralCode)}</span>. Ostvareni popust: <strong>${esc(data.partner?.earnedRenewalDiscountPercent ?? 0)}%</strong>.`
+          );
+          fetchReferrals();
+        } else {
+          showNotice("ref-admin-notice", "bad", esc(data.error || "Greška pri potvrdi uplate."));
+        }
+      } catch {
+        showNotice("ref-admin-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
+    async function revokePaidAttribution(referralCode, attributionId) {
+      try {
+        const res = await adminFetch("/api/admin/referrals/revoke-paid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referralCode, attributionId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotice("ref-admin-notice", "ok", `Status uplate vraćen na čekanje za <span class="mono">${esc(referralCode)}</span>.`);
+          fetchReferrals();
+        } else {
+          showNotice("ref-admin-notice", "bad", esc(data.error || "Greška pri poništavanju."));
+        }
+      } catch {
+        showNotice("ref-admin-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
+    async function submitManualPaidReferral() {
+      const referralCode = (document.getElementById("ref-select-partner")?.value || "").trim();
+      const agencyName = (document.getElementById("ref-new-agency")?.value || "").trim();
+      const agencyPib = (document.getElementById("ref-new-pib")?.value || "").trim();
+      const note = (document.getElementById("ref-new-note")?.value || "").trim();
+
+      if (!referralCode || !agencyName) {
+        showNotice("ref-admin-notice", "bad", "Izaberite partnerski kod i unesite naziv preporučene agencije.");
+        return;
+      }
+      try {
+        const res = await adminFetch("/api/admin/referrals/mark-paid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ referralCode, agencyName, agencyPib, note }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById("ref-new-agency").value = "";
+          document.getElementById("ref-new-pib").value = "";
+          document.getElementById("ref-new-note").value = "";
+          showNotice(
+            "ref-admin-notice",
+            "ok",
+            `Plaćena preporuka zabeležena za <span class="mono">${esc(referralCode)}</span>. Ukupno potvrđeno: <strong>${esc(data.partner?.successfulPaidReferrals ?? 0)}</strong> (${esc(data.partner?.earnedRenewalDiscountPercent ?? 0)}% popusta).`
+          );
+          fetchReferrals();
+        } else {
+          showNotice("ref-admin-notice", "bad", esc(data.error || "Greška pri upisu preporuke."));
+        }
+      } catch {
+        showNotice("ref-admin-notice", "bad", "Greška pri komunikaciji sa serverom.");
+      }
+    }
+
     function refreshAll() {
       fetchOverview();
       fetchLegalMonitor();
       fetchHitlLogs();
       fetchPackagesInfo();
+      fetchReferrals();
     }
 
     refreshAll();

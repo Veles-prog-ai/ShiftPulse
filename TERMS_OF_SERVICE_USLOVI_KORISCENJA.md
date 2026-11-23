@@ -30,3 +30,9 @@ Korišćenjem platforme **ShiftPulse Ledger**, pokretanjem 14-dnevne probne eval
 ## 5. Human-in-the-Loop (HITL) odgovornost i Country Pack verifikacija
 - Svaki poreski proračun, PPP-PD XML prijava, SEF eFaktura i AI predlog mora biti pregledan i potvrđen od strane ovlašćenog knjigovođe pre zvaničnog podnošenja nadležnim poreskim organima.
 - Regionalni *Country Pack* moduli (`HR`, `SI`, `ME`, `DE`) koji nose status šablona zahtevaju zvaničnu HITL verifikaciju lokalnog poreskog stručnjaka pre upotrebe u produkciji.
+
+## 6. B2B Partnerski (Referral) Program i Kontakt
+- **Partnerski popust za obnovu:** Aktivne komercijalne licence (`MID_MARKET_ANNUAL` i `ENTERPRISE_PERPETUAL_BYO_API`) dobijaju jedinstveni partnerski kod (`VELES-XXXX`). Za svakih 10 potvrđeno plaćenih godišnjih licenci koje aktiviraju preporučene agencije, partner ostvaruje **10% popusta** na sledeću obnovu godišnje licence ili godišnjeg SLA (kumulativno do najviše **50% popusta**).
+- **Uslovi validnosti:** Samopreporučivanje istog pravnog lica ili PIB-a nije dozvoljeno. Popust se obračunava isključivo nakon potvrđene uplate preporučene agencije i ne isplaćuje se u gotovini.
+- **Zvanična podrška i kontakt:** `info@veles-lab.com`.
+

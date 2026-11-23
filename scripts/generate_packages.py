@@ -32,6 +32,7 @@ COMMON_CORE_FILES = [
     'server.js',
     'legalMonitorEngine.js',
     'legal_monitor_state.example.json',
+    'referrals_state.example.json',
     'TERMS_OF_SERVICE_USLOVI_KORISCENJA.md',
     'package.json',
     'main.js',

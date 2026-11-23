@@ -16,11 +16,15 @@ import {
   Cpu,
   Mail,
   Scale,
+  Copy,
+  Share2,
+  Gift,
 } from "lucide-react";
 
 export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
   const {
     eulaAccepted,
+    attributedReferralCode,
     refreshLicenseStatus,
     startTrial14d,
     activateCommercialLicense,
@@ -32,6 +36,7 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
   } = useShift();
   const { t } = useLanguage();
   const s = t.ui.licenseModalFull;
+  const rTxt = s.referral || {};
 
   const [activeTab, setActiveTab] = useState("status");
   const [status, setStatus] = useState(null);
@@ -41,6 +46,7 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
   const [inputKey, setInputKey] = useState("");
   const [isActivating, setIsActivating] = useState(false);
   const [isStartingTrial, setIsStartingTrial] = useState(false);
+  const [copiedField, setCopiedField] = useState("");
 
   const [byoDraft, setByoDraft] = useState({
     enabled: Boolean(byoApiConfig?.enabled),
@@ -172,7 +178,7 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
   const usedClients = companies?.length || 0;
   const usedSeats = localAccounts?.length || 1;
 
-  const addonMailHref = `mailto:support@veles-lab.com?subject=${encodeURIComponent(
+  const addonMailHref = `mailto:info@veles-lab.com?subject=${encodeURIComponent(
     s.addonMailSubject || "Capacity Add-On",
   )}&body=${interpolate(s.addonMailBody || "", {
     entity: status?.licenciraniPravniSubjekat || "Agency",
@@ -181,6 +187,39 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
     usedSeats,
     maxSeats,
   })}`;
+
+  const referralData = status?.referral || null;
+  const referralEligible = Boolean(referralData?.eligible && referralData?.referralCode);
+  const referralsStep = Number(referralData?.referralsPerStep || status?.referralConfig?.referralsPerDiscountStep) || 10;
+  const discountPerStep = Number(referralData?.discountPerStepPercent || status?.referralConfig?.discountPerStepPercent) || 10;
+  const maxDiscount = Number(referralData?.maxDiscountPercent || status?.referralConfig?.maxStackableDiscountPercent) || 50;
+  const paidReferralsCount = Number(referralData?.successfulPaidReferrals) || 0;
+  const pendingReferralsCount = Number(referralData?.pendingCount) || 0;
+  const earnedDiscountPercent = Number(referralData?.earnedRenewalDiscountPercent) || 0;
+  const progressIntoStep = Number(referralData?.progressTowardNextStep) || 0;
+  const progressPercent = earnedDiscountPercent >= maxDiscount
+    ? 100
+    : Math.min(100, Math.round((progressIntoStep / referralsStep) * 100));
+
+  const handleCopyReferral = async (field, text) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(""), 2000);
+    } catch {
+      setErrorMsg(text);
+    }
+  };
+
+  const referralInviteHref = referralEligible
+    ? `mailto:?subject=${encodeURIComponent(
+        rTxt.emailInviteSubject || "ShiftPulse Ledger Partner Recommendation",
+      )}&body=${interpolate(rTxt.emailInviteBody || "{{shareUrl}} ({{code}})", {
+        shareUrl: referralData.shareUrl,
+        code: referralData.referralCode,
+      })}`
+    : "#";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs">
@@ -643,6 +682,129 @@ export const B2BLicenseManagementModal = ({ onClose, onLicenseUpdated }) => {
                         {status?.boundHost ? ` · ${s.boundHostLabel}: ${status.boundHost}` : ""}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Partner / Referral Program */}
+                  <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/70 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                        <Gift className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>{rTxt.sectionTitle || "Partner / Preporuči kolegama"}</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 text-[11px] font-bold">
+                        {interpolate(rTxt.maxDiscountBadge || "Max {{max}}%", { max: maxDiscount })}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {rTxt.sectionDesc}
+                    </p>
+
+                    {attributedReferralCode && (
+                      <div className="p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-[11px] font-semibold text-indigo-800 dark:text-indigo-200">
+                        {interpolate(rTxt.attributedBanner || "Active referral attribution: {{code}}", {
+                          code: attributedReferralCode,
+                        })}
+                      </div>
+                    )}
+
+                    {referralEligible ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {rTxt.codeLabel}
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                                {referralData.referralCode}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyReferral("code", referralData.referralCode)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>{copiedField === "code" ? (rTxt.copiedBtn || "Copied!") : (rTxt.copyCodeBtn || "Copy")}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {rTxt.earnedDiscountLabel}
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-2">
+                              <span className="font-mono font-extrabold text-base text-emerald-600 dark:text-emerald-400">
+                                {earnedDiscountPercent}%
+                              </span>
+                              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                                {paidReferralsCount} {rTxt.confirmedCountLabel?.toLowerCase() || "paid"}
+                                {pendingReferralsCount > 0 ? ` · ${pendingReferralsCount} ${rTxt.pendingCountLabel?.toLowerCase() || "pending"}` : ""}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-semibold text-slate-600 dark:text-slate-300">
+                              {rTxt.shareUrlLabel}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyReferral("link", referralData.shareUrl)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer"
+                              >
+                                <Share2 className="w-3 h-3" />
+                                <span>{copiedField === "link" ? (rTxt.copiedBtn || "Copied!") : (rTxt.copyLinkBtn || "Copy Link")}</span>
+                              </button>
+                              <a
+                                href={referralInviteHref}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold"
+                              >
+                                <Mail className="w-3 h-3" />
+                                <span>{rTxt.emailInviteBtn || "Email"}</span>
+                              </a>
+                            </div>
+                          </div>
+                          <div className="font-mono text-[11px] text-slate-700 dark:text-slate-300 break-all bg-slate-50 dark:bg-slate-950 px-2.5 py-1.5 rounded border border-slate-200 dark:border-slate-800">
+                            {referralData.shareUrl}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                            <span>
+                              {earnedDiscountPercent >= maxDiscount
+                                ? interpolate(rTxt.maxTierReached || "Max {{max}}% achieved!", { max: maxDiscount })
+                                : interpolate(rTxt.progressLabel || "{{current}} / {{step}}", {
+                                    current: progressIntoStep,
+                                    step: referralsStep,
+                                    stepDiscount: discountPerStep,
+                                  })}
+                            </span>
+                            <span className="font-mono text-emerald-700 dark:text-emerald-300">
+                              {earnedDiscountPercent}% / {maxDiscount}%
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 transition-all"
+                              style={{ width: `${progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-white/80 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
+                        <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">
+                          {rTxt.lockedTitle}
+                        </strong>
+                        <span>{rTxt.lockedDesc}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Anti-Clock Tampering */}

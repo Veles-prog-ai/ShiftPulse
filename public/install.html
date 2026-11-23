@@ -356,6 +356,10 @@
         <strong>Launch v1.0 Availability — Republic of Serbia (RS) Only:</strong> This release is configured exclusively for Serbian statutory payroll, PURS PPP-PD XML, SEF eFaktura, and NBS IPS orders. Additional countries will roll out in subsequent releases.
       </div>
 
+      <div id="referralInstallBanner" style="display: none; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 14px; padding: 11px 14px; margin-bottom: 18px; font-size: 12px; color: #a7f3d0; line-height: 1.45;">
+        <strong>Partner Referral Active:</strong> Code <code id="referralInstallCode" style="font-weight: 800; color: #ffffff;"></code> will be attached automatically when you start a 14-day trial or activate a commercial license.
+      </div>
+
       <div class="install-action-box">
         <button id="pwaInstallBtn" class="btn-install-primary">
           <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -446,8 +450,11 @@
       </div>
 
       <div class="footer-actions">
-        <a href="/" class="btn-ghost">Back to Website</a>
-        <a href="/?app=1" class="btn-launch-web">
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <a href="/" id="backToSiteLink" class="btn-ghost">Back to Website</a>
+          <a href="mailto:info@veles-lab.com" class="btn-ghost">info@veles-lab.com</a>
+        </div>
+        <a href="/?app=1" id="openWorkspaceLink" class="btn-launch-web">
           <span>Open Client Workspace</span>
         </a>
       </div>
@@ -455,14 +462,43 @@
   </div>
 
   <script>
+    const REFERRAL_STORAGE_KEY = 'shiftpulse_referral_code_v1';
+    let activeRefCode = '';
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const urlRef = (params.get('ref') || '').trim().toUpperCase();
+      if (/^VELES-[A-Z0-9]{4,10}$/.test(urlRef)) {
+        localStorage.setItem(REFERRAL_STORAGE_KEY, urlRef);
+        activeRefCode = urlRef;
+      } else {
+        const savedRef = (localStorage.getItem(REFERRAL_STORAGE_KEY) || '').trim().toUpperCase();
+        if (/^VELES-[A-Z0-9]{4,10}$/.test(savedRef)) {
+          activeRefCode = savedRef;
+        }
+      }
+    } catch {}
+
+    if (activeRefCode) {
+      const refBanner = document.getElementById('referralInstallBanner');
+      const refCodeEl = document.getElementById('referralInstallCode');
+      if (refBanner && refCodeEl) {
+        refCodeEl.textContent = activeRefCode;
+        refBanner.style.display = 'block';
+      }
+      const wsLink = document.getElementById('openWorkspaceLink');
+      if (wsLink) wsLink.href = '/?app=1&ref=' + encodeURIComponent(activeRefCode);
+      const backLink = document.getElementById('backToSiteLink');
+      if (backLink) backLink.href = '/?ref=' + encodeURIComponent(activeRefCode);
+    }
+
     const inIframe = window.self !== window.top;
     const iframeAlert = document.getElementById('iframeAlert');
     const breakoutLink = document.getElementById('breakoutLink');
-    const effectiveUrl = window.location.origin + '/install';
+    const effectiveUrl = window.location.origin + '/install' + (activeRefCode ? ('?ref=' + encodeURIComponent(activeRefCode)) : '');
 
     if (inIframe) {
       iframeAlert.style.display = 'block';
-      breakoutLink.href = '/install';
+      breakoutLink.href = '/install' + (activeRefCode ? ('?ref=' + encodeURIComponent(activeRefCode)) : '');
     }
 
     const shareInput = document.getElementById('shareUrlInput');

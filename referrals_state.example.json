@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "config": {
+    "referralsPerDiscountStep": 10,
+    "discountPerStepPercent": 10,
+    "maxStackableDiscountPercent": 50
+  },
+  "partners": [
+    {
+      "referralCode": "VELES-DEMO",
+      "licenseId": "SPL-MID-DEMO01",
+      "licenseType": "MID_MARKET_ANNUAL",
+      "agencyName": "Primer Knjigovodstvena Agencija d.o.o.",
+      "agencyPib": "109876543",
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "successfulPaidReferrals": 0,
+      "referredAgencies": []
+    }
+  ],
+  "pendingAttributions": []
+}

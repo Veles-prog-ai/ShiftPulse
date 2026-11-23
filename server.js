@@ -728,6 +728,399 @@ function persistActiveLicenseKey(keyStr) {
 let activeClientLicenseKey = loadPersistedActiveLicenseKey();
 const ISSUED_LICENSES_AUDIT_FILE = path.join(__dirname, "issued_licenses_audit.jsonl");
 
+// ========================================================
+// STACKABLE B2B REFERRAL PROGRAM ENGINE
+// ========================================================
+const REFERRALS_PER_DISCOUNT_STEP = Math.max(
+  1,
+  Number(process.env.REFERRALS_PER_DISCOUNT_STEP) || 10,
+);
+const DISCOUNT_PER_STEP_PERCENT = Math.max(
+  1,
+  Number(process.env.DISCOUNT_PER_STEP_PERCENT) || 10,
+);
+const MAX_STACKABLE_DISCOUNT_PERCENT = Math.min(
+  100,
+  Math.max(1, Number(process.env.MAX_STACKABLE_DISCOUNT_PERCENT) || 50),
+);
+const REFERRAL_BASE_URL = (
+  process.env.REFERRAL_BASE_URL || "https://shiftpulse.veles-lab.com"
+).replace(/\/+$/, "");
+const REFERRALS_STATE_FILE = path.join(__dirname, "referrals_state.json");
+const REFERRAL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function isCommercialReferralEligible(licenseType) {
+  return (
+    licenseType === "MID_MARKET_ANNUAL" ||
+    licenseType === "ENTERPRISE_PERPETUAL_BYO_API"
+  );
+}
+
+function normalizeReferralCode(raw) {
+  const cleaned = String(raw || "").trim().toUpperCase();
+  if (/^VELES-[A-Z0-9]{4,10}$/.test(cleaned)) {
+    return cleaned;
+  }
+  return "";
+}
+
+function buildReferralShareUrl(referralCode) {
+  return `${REFERRAL_BASE_URL}/?ref=${encodeURIComponent(referralCode)}`;
+}
+
+function computeReferralRewardMetrics(successfulPaidReferrals = 0) {
+  const paidCount = Math.max(0, Math.floor(Number(successfulPaidReferrals) || 0));
+  const completedSteps = Math.floor(paidCount / REFERRALS_PER_DISCOUNT_STEP);
+  const earnedRenewalDiscountPercent = Math.min(
+    MAX_STACKABLE_DISCOUNT_PERCENT,
+    completedSteps * DISCOUNT_PER_STEP_PERCENT,
+  );
+  const isMaxDiscountReached =
+    earnedRenewalDiscountPercent >= MAX_STACKABLE_DISCOUNT_PERCENT;
+  const progressInCurrentStep = paidCount % REFERRALS_PER_DISCOUNT_STEP;
+  const remainingForNextTier = isMaxDiscountReached
+    ? 0
+    : REFERRALS_PER_DISCOUNT_STEP - progressInCurrentStep;
+  const nextTierDiscountPercent = isMaxDiscountReached
+    ? MAX_STACKABLE_DISCOUNT_PERCENT
+    : Math.min(
+        MAX_STACKABLE_DISCOUNT_PERCENT,
+        earnedRenewalDiscountPercent + DISCOUNT_PER_STEP_PERCENT,
+      );
+
+  return {
+    successfulPaidReferrals: paidCount,
+    referralsPerDiscountStep: REFERRALS_PER_DISCOUNT_STEP,
+    discountPerStepPercent: DISCOUNT_PER_STEP_PERCENT,
+    maxStackableDiscountPercent: MAX_STACKABLE_DISCOUNT_PERCENT,
+    completedSteps,
+    earnedRenewalDiscountPercent,
+    isMaxDiscountReached,
+    progressInCurrentStep,
+    remainingForNextTier,
+    nextTierDiscountPercent,
+  };
+}
+
+function loadReferralsState() {
+  try {
+    if (fs.existsSync(REFERRALS_STATE_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(REFERRALS_STATE_FILE, "utf8"));
+      if (parsed && Array.isArray(parsed.partners)) {
+        return {
+          version: Number(parsed.version) || 1,
+          partners: parsed.partners,
+          pendingAttributions: Array.isArray(parsed.pendingAttributions)
+            ? parsed.pendingAttributions
+            : [],
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("[Referrals] Failed to read referrals_state.json:", err.message);
+  }
+  return { version: 1, partners: [], pendingAttributions: [] };
+}
+
+function saveReferralsState(state) {
+  try {
+    const payload = {
+      version: 1,
+      config: {
+        referralsPerDiscountStep: REFERRALS_PER_DISCOUNT_STEP,
+        discountPerStepPercent: DISCOUNT_PER_STEP_PERCENT,
+        maxStackableDiscountPercent: MAX_STACKABLE_DISCOUNT_PERCENT,
+      },
+      partners: Array.isArray(state?.partners) ? state.partners : [],
+      pendingAttributions: Array.isArray(state?.pendingAttributions)
+        ? state.pendingAttributions
+        : [],
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(
+      REFERRALS_STATE_FILE,
+      JSON.stringify(payload, null, 2),
+      "utf8",
+    );
+  } catch (error) {
+    console.warn("[Referrals] State write warning:", error.message);
+  }
+}
+
+function generateUniqueReferralCode(existingCodesSet) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const bytes = crypto.randomBytes(4);
+    let suffix = "";
+    for (let i = 0; i < 4; i++) {
+      suffix += REFERRAL_ALPHABET[bytes[i] % REFERRAL_ALPHABET.length];
+    }
+    const candidate = `VELES-${suffix}`;
+    if (!existingCodesSet.has(candidate)) {
+      return candidate;
+    }
+  }
+  return `VELES-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function formatPartnerReferralView(partner) {
+  const referralsList = Array.isArray(partner.referredAgencies)
+    ? partner.referredAgencies
+    : [];
+  const confirmedCount = referralsList.filter(
+    (r) => r && r.status === "paid_confirmed",
+  ).length;
+  const effectivePaidCount = Math.max(
+    confirmedCount,
+    Number(partner.successfulPaidReferrals) || 0,
+  );
+  const metrics = computeReferralRewardMetrics(effectivePaidCount);
+  return {
+    eligible: true,
+    referralCode: partner.referralCode,
+    shareUrl: buildReferralShareUrl(partner.referralCode),
+    licenseId: partner.licenseId || "",
+    licenseType: partner.licenseType || "MID_MARKET_ANNUAL",
+    agencyName: partner.agencyName || "",
+    agencyPib: partner.agencyPib || "",
+    createdAt: partner.createdAt || null,
+    pendingCount: referralsList.filter((r) => r && r.status !== "paid_confirmed")
+      .length,
+    referredAgencies: referralsList,
+    ...metrics,
+  };
+}
+
+function ensurePartnerReferralForLicense(licensePayload) {
+  if (
+    !licensePayload ||
+    !isCommercialReferralEligible(licensePayload.licenseType)
+  ) {
+    return null;
+  }
+
+  const state = loadReferralsState();
+  const targetLicenseId = String(licensePayload.licenseId || "").trim();
+  const targetPib = String(licensePayload.pibAgencije || "").trim();
+  const targetAgencyName = String(
+    licensePayload.nazivAgencije || "Licensed Agency",
+  ).trim();
+
+  let partner = state.partners.find(
+    (p) =>
+      (targetLicenseId && p.licenseId === targetLicenseId) ||
+      (targetPib &&
+        targetPib !== "000000000" &&
+        String(p.agencyPib || "").trim() === targetPib),
+  );
+
+  if (!partner) {
+    const existingCodes = new Set(state.partners.map((p) => p.referralCode));
+    const referralCode = generateUniqueReferralCode(existingCodes);
+    partner = {
+      referralCode,
+      licenseId: targetLicenseId || `SPL-${referralCode}`,
+      licenseType: licensePayload.licenseType,
+      agencyName: targetAgencyName,
+      agencyPib: targetPib,
+      createdAt: new Date().toISOString(),
+      successfulPaidReferrals: 0,
+      referredAgencies: [],
+    };
+    state.partners.push(partner);
+    saveReferralsState(state);
+  } else {
+    let dirty = false;
+    if (targetLicenseId && partner.licenseId !== targetLicenseId) {
+      partner.licenseId = targetLicenseId;
+      dirty = true;
+    }
+    if (targetAgencyName && partner.agencyName !== targetAgencyName) {
+      partner.agencyName = targetAgencyName;
+      dirty = true;
+    }
+    if (partner.licenseType !== licensePayload.licenseType) {
+      partner.licenseType = licensePayload.licenseType;
+      dirty = true;
+    }
+    if (dirty) saveReferralsState(state);
+  }
+
+  return formatPartnerReferralView(partner);
+}
+
+function recordReferralAttribution({
+  referredByCode,
+  agencyName = "Evaluation Agency",
+  agencyPib = "000000000",
+  licenseId = "",
+  source = "trial_activation",
+}) {
+  const code = normalizeReferralCode(referredByCode);
+  if (!code) {
+    return { recorded: false, reason: "INVALID_OR_EMPTY_CODE" };
+  }
+  const state = loadReferralsState();
+  const partner = state.partners.find((p) => p.referralCode === code);
+  if (!partner) {
+    return { recorded: false, reason: "PARTNER_CODE_NOT_FOUND" };
+  }
+
+  const cleanPib = String(agencyPib || "000000000").trim();
+  const cleanName = String(agencyName || "Evaluation Agency").trim();
+  const cleanLicId = String(licenseId || "").trim();
+
+  // Prevent self-referral
+  if (
+    (cleanLicId && partner.licenseId === cleanLicId) ||
+    (cleanPib !== "000000000" &&
+      String(partner.agencyPib || "").trim() === cleanPib)
+  ) {
+    return { recorded: false, reason: "SELF_REFERRAL_BLOCKED" };
+  }
+
+  partner.referredAgencies = Array.isArray(partner.referredAgencies)
+    ? partner.referredAgencies
+    : [];
+
+  const duplicate = partner.referredAgencies.find(
+    (entry) =>
+      (cleanLicId && entry.licenseId === cleanLicId) ||
+      (cleanPib !== "000000000" &&
+        String(entry.agencyPib || "").trim() === cleanPib),
+  );
+  if (duplicate) {
+    return { recorded: false, reason: "ALREADY_ATTRIBUTED", entry: duplicate };
+  }
+
+  const entry = {
+    id: `ref-${crypto.randomBytes(4).toString("hex")}`,
+    agencyName: cleanName,
+    agencyPib: cleanPib,
+    licenseId: cleanLicId || null,
+    source: String(source || "trial_activation"),
+    attributedAt: new Date().toISOString(),
+    status: "pending_payment",
+    paidConfirmedAt: null,
+    note: "",
+  };
+  partner.referredAgencies.push(entry);
+  saveReferralsState(state);
+  return { recorded: true, referralCode: code, entry };
+}
+
+function markReferralPaidAdmin({
+  referralCode,
+  attributionId = "",
+  agencyName = "",
+  agencyPib = "",
+  note = "",
+}) {
+  const code = normalizeReferralCode(referralCode);
+  if (!code) {
+    return { success: false, error: "Valid partner referral code (VELES-XXXX) is required." };
+  }
+  const state = loadReferralsState();
+  const partner = state.partners.find((p) => p.referralCode === code);
+  if (!partner) {
+    return { success: false, error: `Partner referral code ${code} not found.` };
+  }
+
+  partner.referredAgencies = Array.isArray(partner.referredAgencies)
+    ? partner.referredAgencies
+    : [];
+
+  let targetEntry = attributionId
+    ? partner.referredAgencies.find((r) => r.id === attributionId)
+    : null;
+
+  if (!targetEntry) {
+    const cleanPib = String(agencyPib || "").trim();
+    const cleanName = String(agencyName || "").trim();
+    if (!cleanName) {
+      return {
+        success: false,
+        error: "Referred agency name is required when logging a new paid referral.",
+      };
+    }
+    if (
+      cleanPib &&
+      cleanPib !== "000000000" &&
+      String(partner.agencyPib || "").trim() === cleanPib
+    ) {
+      return {
+        success: false,
+        error: "Self-referral is not permitted for the same agency PIB.",
+      };
+    }
+    const existingByPib =
+      cleanPib && cleanPib !== "000000000"
+        ? partner.referredAgencies.find(
+            (r) => String(r.agencyPib || "").trim() === cleanPib,
+          )
+        : null;
+    if (existingByPib) {
+      targetEntry = existingByPib;
+    } else {
+      targetEntry = {
+        id: `ref-${crypto.randomBytes(4).toString("hex")}`,
+        agencyName: cleanName,
+        agencyPib: cleanPib || "N/A",
+        licenseId: null,
+        source: "admin_manual_verified",
+        attributedAt: new Date().toISOString(),
+        status: "pending_payment",
+        paidConfirmedAt: null,
+        note: String(note || "").trim(),
+      };
+      partner.referredAgencies.push(targetEntry);
+    }
+  }
+
+  targetEntry.status = "paid_confirmed";
+  targetEntry.paidConfirmedAt =
+    targetEntry.paidConfirmedAt || new Date().toISOString();
+  if (note) targetEntry.note = String(note).trim();
+
+  partner.successfulPaidReferrals = partner.referredAgencies.filter(
+    (r) => r.status === "paid_confirmed",
+  ).length;
+
+  saveReferralsState(state);
+  return {
+    success: true,
+    partner: formatPartnerReferralView(partner),
+    entry: targetEntry,
+  };
+}
+
+function revokeReferralPaidAdmin({ referralCode, attributionId }) {
+  const code = normalizeReferralCode(referralCode);
+  if (!code || !attributionId) {
+    return { success: false, error: "Referral code and attributionId are required." };
+  }
+  const state = loadReferralsState();
+  const partner = state.partners.find((p) => p.referralCode === code);
+  if (!partner) {
+    return { success: false, error: `Partner referral code ${code} not found.` };
+  }
+  const targetEntry = (partner.referredAgencies || []).find(
+    (r) => r.id === attributionId,
+  );
+  if (!targetEntry) {
+    return { success: false, error: "Referral entry not found." };
+  }
+  targetEntry.status = "pending_payment";
+  targetEntry.paidConfirmedAt = null;
+  partner.successfulPaidReferrals = partner.referredAgencies.filter(
+    (r) => r.status === "paid_confirmed",
+  ).length;
+  saveReferralsState(state);
+  return {
+    success: true,
+    partner: formatPartnerReferralView(partner),
+  };
+}
+
 function appendIssuedLicenseAudit(entry) {
   try {
     fs.appendFileSync(ISSUED_LICENSES_AUDIT_FILE, JSON.stringify(entry) + "\n", "utf8");
@@ -821,6 +1214,9 @@ async function resolveLicenseStatusSnapshot(customKeyOverride = "", requestHost 
   if (check.validna && check.podaci) {
     const p = check.podaci;
     const isTrial = p.licenseType === "TRIAL_14D";
+    const referralInfo = isCommercialReferralEligible(p.licenseType)
+      ? ensurePartnerReferralForLicense(p)
+      : null;
     return {
       success: true,
       valid: true,
@@ -852,6 +1248,10 @@ async function resolveLicenseStatusSnapshot(customKeyOverride = "", requestHost 
         "b2b_shift_management",
         "eporezi_xml",
       ],
+      referral: referralInfo,
+      referralConfig: computeReferralRewardMetrics(
+        referralInfo?.successfulPaidReferrals || 0,
+      ),
       antiClockTampering: {
         isTimeValid: true,
         lastRecorded: timeCheck.lastRecorded,
@@ -916,6 +1316,8 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
       boundFingerprint,
       boundHost,
       tier,
+      appliedReferralCode,
+      appliedDiscountPercent,
     } = req.body || {};
     const resolvedType = normalizeLicenseType(licenseType, tier);
 
@@ -952,6 +1354,11 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
       .digest("hex")
       .slice(0, 12);
 
+    const partnerReferral =
+      decodedPreview.podaci && isCommercialReferralEligible(resolvedType)
+        ? ensurePartnerReferralForLicense(decodedPreview.podaci)
+        : null;
+
     appendIssuedLicenseAudit({
       issuedAt: new Date().toISOString(),
       licenseType: resolvedType,
@@ -964,6 +1371,9 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
       lawTrackerSlaExpiry: decodedPreview.podaci?.law_tracker_sla_expiry || null,
       tier: decodedPreview.podaci?.tier || resolvedType,
       keyFingerprint,
+      appliedReferralCode: normalizeReferralCode(appliedReferralCode) || null,
+      appliedDiscountPercent: Number(appliedDiscountPercent) || 0,
+      partnerReferralCode: partnerReferral?.referralCode || null,
     });
 
     res.json({
@@ -973,6 +1383,7 @@ app.post("/api/license/admin-generate", requireAdminAuth, (req, res) => {
       licenseKey: generatedKey,
       keyFingerprint,
       payloadPreview: decodedPreview.podaci,
+      partnerReferral,
       napomena:
         "Copy this key and provide it to the accounting firm for workstation activation.",
     });
@@ -990,6 +1401,7 @@ app.post("/api/license/start-trial", async (req, res) => {
       eulaAccepted,
       companyName = "Evaluation Agency",
       companyTaxId = "000000000",
+      referredByCode = "",
     } = req.body || {};
 
     if (eulaAccepted !== true) {
@@ -1011,6 +1423,17 @@ app.post("/api/license/start-trial", async (req, res) => {
       boundHost: requestHost || null,
     });
 
+    const decodedTrial = validateLocalLicense(trialKey, req.headers.host);
+    const referralAttribution = referredByCode
+      ? recordReferralAttribution({
+          referredByCode,
+          agencyName: decodedTrial.podaci?.nazivAgencije || companyName,
+          agencyPib: decodedTrial.podaci?.pibAgencije || companyTaxId,
+          licenseId: decodedTrial.podaci?.licenseId || "",
+          source: "trial_activation",
+        })
+      : { recorded: false };
+
     activeClientLicenseKey = trialKey;
     persistActiveLicenseKey(trialKey);
     await pluginManager.initialize(activeClientLicenseKey);
@@ -1020,6 +1443,7 @@ app.post("/api/license/start-trial", async (req, res) => {
       success: true,
       licenseKey: trialKey,
       status: snapshot,
+      referralAttribution,
       message: "14-day hardware & domain-bound evaluation license activated.",
     });
   } catch (error) {
@@ -1037,9 +1461,27 @@ app.get("/api/license/status", async (req, res) => {
   res.json(snapshot);
 });
 
+app.get("/api/license/referral", async (req, res) => {
+  const customKey = String(req.headers["x-license-key"] || req.query.key || "");
+  const snapshot = await resolveLicenseStatusSnapshot(customKey, req.headers.host);
+  if (!snapshot?.valid || !isCommercialReferralEligible(snapshot.licenseType)) {
+    return res.json({
+      success: true,
+      eligible: false,
+      reason: "COMMERCIAL_LICENSE_REQUIRED",
+      licenseType: snapshot?.licenseType || "UNLICENSED_SANDBOX",
+      ...computeReferralRewardMetrics(0),
+    });
+  }
+  return res.json({
+    success: true,
+    ...snapshot.referral,
+  });
+});
+
 app.post("/api/license/activate", async (req, res) => {
   try {
-    const { kljucLicence, eulaAccepted } = req.body || {};
+    const { kljucLicence, eulaAccepted, referredByCode = "" } = req.body || {};
     if (eulaAccepted === false) {
       return res.status(400).json({
         success: false,
@@ -1061,6 +1503,23 @@ app.post("/api/license/activate", async (req, res) => {
       });
       return;
     }
+
+    const referralAttribution = referredByCode
+      ? recordReferralAttribution({
+          referredByCode,
+          agencyName: validation.podaci?.nazivAgencije || "Licensed Agency",
+          agencyPib: validation.podaci?.pibAgencije || "000000000",
+          licenseId: validation.podaci?.licenseId || "",
+          source: "commercial_activation",
+        })
+      : { recorded: false };
+
+    const partnerReferral = isCommercialReferralEligible(
+      validation.podaci?.licenseType,
+    )
+      ? ensurePartnerReferralForLicense(validation.podaci)
+      : null;
+
     activeClientLicenseKey = kljucLicence.trim();
     persistActiveLicenseKey(activeClientLicenseKey);
     await pluginManager.initialize(activeClientLicenseKey);
@@ -1069,6 +1528,8 @@ app.post("/api/license/activate", async (req, res) => {
       success: true,
       message: "License successfully verified and activated on this workstation.",
       licenca: validation.podaci,
+      referral: partnerReferral,
+      referralAttribution,
       status: snapshot,
     });
   } catch (error) {
@@ -1855,6 +2316,8 @@ app.get("/api/admin/overview", async (_req, res) => {
         .split(/\r?\n/)
         .filter(Boolean).length;
     }
+    const referralsState = loadReferralsState();
+    const formattedPartners = referralsState.partners.map(formatPartnerReferralView);
     res.json({
       success: true,
       server: {
@@ -1880,10 +2343,77 @@ app.get("/api/admin/overview", async (_req, res) => {
         lastCheckAt: lm.telemetry.lastCheckAt,
         lawTrackerSla: lm.lawTrackerSla,
       },
+      referralsSummary: {
+        totalPartners: formattedPartners.length,
+        totalPaidReferrals: formattedPartners.reduce(
+          (sum, p) => sum + p.successfulPaidReferrals,
+          0,
+        ),
+        totalPendingReferrals: formattedPartners.reduce(
+          (sum, p) => sum + p.pendingCount,
+          0,
+        ),
+      },
       issuedLicenses: readIssuedLicenseAudit(25),
       plugins: pluginManager.getRegistrySnapshot(),
       timestamp: new Date().toISOString(),
     });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ========================================================
+// ADMIN REFERRAL PROGRAM MANAGEMENT ROUTES (PROTECTED)
+// ========================================================
+app.get("/api/admin/referrals", (_req, res) => {
+  try {
+    const state = loadReferralsState();
+    const partners = state.partners.map(formatPartnerReferralView);
+    res.json({
+      success: true,
+      config: {
+        referralsPerDiscountStep: REFERRALS_PER_DISCOUNT_STEP,
+        discountPerStepPercent: DISCOUNT_PER_STEP_PERCENT,
+        maxStackableDiscountPercent: MAX_STACKABLE_DISCOUNT_PERCENT,
+        referralBaseUrl: REFERRAL_BASE_URL,
+      },
+      partners,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/admin/referrals/mark-paid", (req, res) => {
+  try {
+    const { referralCode, attributionId, agencyName, agencyPib, note } =
+      req.body || {};
+    const outcome = markReferralPaidAdmin({
+      referralCode,
+      attributionId,
+      agencyName,
+      agencyPib,
+      note,
+    });
+    if (!outcome.success) {
+      return res.status(400).json(outcome);
+    }
+    res.json(outcome);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/admin/referrals/revoke-paid", (req, res) => {
+  try {
+    const { referralCode, attributionId } = req.body || {};
+    const outcome = revokeReferralPaidAdmin({ referralCode, attributionId });
+    if (!outcome.success) {
+      return res.status(400).json(outcome);
+    }
+    res.json(outcome);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

@@ -41,6 +41,23 @@ const DEMO_CLEANUP_FLAG_KEY = "shiftpulse_prod_clean_v1";
 const EULA_ACCEPTED_KEY = "shiftpulse_eula_accepted_v1";
 const BYO_API_CONFIG_KEY = "shiftpulse_enterprise_byo_api_v1";
 const LICENSE_KEY_STORAGE_KEY = "shiftpulse_license_key_v1";
+const REFERRAL_ATTRIBUTION_KEY = "shiftpulse_referral_code_v1";
+
+function readAndCaptureReferralAttribution() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const urlRef = (params.get("ref") || "").trim().toUpperCase();
+    if (/^VELES-[A-Z0-9]{4,10}$/.test(urlRef)) {
+      localStorage.setItem(REFERRAL_ATTRIBUTION_KEY, urlRef);
+      return urlRef;
+    }
+    const saved = (localStorage.getItem(REFERRAL_ATTRIBUTION_KEY) || "").trim().toUpperCase();
+    if (/^VELES-[A-Z0-9]{4,10}$/.test(saved)) {
+      return saved;
+    }
+  } catch {}
+  return "";
+}
 
 const DEFAULT_BYO_API_CONFIG = {
   enabled: false,
@@ -77,6 +94,8 @@ function mapServerLicenseSnapshot(data = {}, cachedKey = "") {
     maxClientCompanies: Number(data.maxClientCompanies) || 3,
     maxOperatorSeats: Number(data.maxOperatorSeats) || 2,
     features: Array.isArray(data.features) ? data.features : [],
+    referral: data.referral || null,
+    referralConfig: data.referralConfig || null,
     antiClockTampering: data.antiClockTampering || { isTimeValid: true },
     kljuc: cachedKey || data.licenseId || "STATION-KEY",
     poruka: data.poruka || "",
@@ -257,6 +276,9 @@ export const ShiftProvider = ({ children }) => {
       poruka: "Checking workstation license...",
     }),
   );
+  const [attributedReferralCode] = useState(() =>
+    readAndCaptureReferralAttribution(),
+  );
   const [licenseActionError, setLicenseActionError] = useState(null);
   const clearLicenseActionError = () => setLicenseActionError(null);
 
@@ -293,6 +315,7 @@ export const ShiftProvider = ({ children }) => {
     if (!eulaAccepted) {
       return { ok: false, code: "EULA_REQUIRED", error: "EULA acceptance required." };
     }
+    const referredByCode = readAndCaptureReferralAttribution();
     const res = await fetch("/api/license/start-trial", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -300,6 +323,7 @@ export const ShiftProvider = ({ children }) => {
         eulaAccepted: true,
         companyName,
         companyTaxId,
+        referredByCode,
       }),
     });
     const data = await res.json();
@@ -322,12 +346,14 @@ export const ShiftProvider = ({ children }) => {
       return { ok: false, code: "EULA_REQUIRED", error: "EULA acceptance required." };
     }
     const trimmed = String(kljucLicence || "").trim();
+    const referredByCode = readAndCaptureReferralAttribution();
     const res = await fetch("/api/license/activate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         kljucLicence: trimmed,
         eulaAccepted: true,
+        referredByCode,
       }),
     });
     const data = await res.json();
@@ -1715,6 +1741,7 @@ export const ShiftProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       license,
+      attributedReferralCode,
       refreshLicenseStatus,
       startTrial14d,
       activateCommercialLicense,
@@ -1871,6 +1898,7 @@ export const ShiftProvider = ({ children }) => {
     }),
     [
       license,
+      attributedReferralCode,
       isReadOnlyLocked,
       licenseActionError,
       eulaAccepted,

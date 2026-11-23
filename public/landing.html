@@ -514,6 +514,9 @@
         <div class="trust-bar">
           Bez kreditne kartice • Svi finansijski podaci ostaju na Vašem računaru • Instalacija za 5 minuta (Windows / Linux / ChromeOS)
         </div>
+        <div id="referralAttrBanner" style="display: none; margin-top: 14px; padding: 8px 14px; border-radius: 10px; background: var(--emerald-bg); border: 1px solid var(--emerald-border); color: #065f46; font-size: 13px; font-weight: 700;">
+          Aktivna partnerska preporuka: kod <span id="referralAttrCode" style="font-family: monospace;"></span> biće automatski prosleđen pri aktivaciji.
+        </div>
       </div>
     </section>
 
@@ -732,7 +735,7 @@
       <div class="footer-links">
         <a href="/install">Instalacioni portal</a>
         <a href="/?app=1">Otvori radnu stanicu</a>
-        <a href="mailto:kontakt@veles-lab.com">kontakt@veles-lab.com</a>
+        <a href="mailto:info@veles-lab.com">info@veles-lab.com</a>
       </div>
     </div>
   </footer>
@@ -759,13 +762,47 @@
         <button type="submit" class="btn-primary" style="width: 100%;">Pripremi zahtev za prikaz (email)</button>
       </form>
       <div class="demo-status" id="demoStatus">
-        Email klijent je otvoren sa pripremljenim zahtevom. Takođe nam možete pisati direktno na <strong>kontakt@veles-lab.com</strong>.
+        Email klijent je otvoren sa pripremljenim zahtevom. Takođe nam možete pisati direktno na <strong>info@veles-lab.com</strong>.
       </div>
     </div>
   </div>
 
   <script>
     (function () {
+      var REFERRAL_STORAGE_KEY = 'shiftpulse_referral_code_v1';
+      var activeRefCode = '';
+      try {
+        var params = new URLSearchParams(window.location.search || '');
+        var urlRef = (params.get('ref') || '').trim().toUpperCase();
+        if (/^VELES-[A-Z0-9]{4,10}$/.test(urlRef)) {
+          localStorage.setItem(REFERRAL_STORAGE_KEY, urlRef);
+          activeRefCode = urlRef;
+        } else {
+          var savedRef = (localStorage.getItem(REFERRAL_STORAGE_KEY) || '').trim().toUpperCase();
+          if (/^VELES-[A-Z0-9]{4,10}$/.test(savedRef)) {
+            activeRefCode = savedRef;
+          }
+        }
+      } catch (e) {}
+
+      if (activeRefCode) {
+        var banner = document.getElementById('referralAttrBanner');
+        var codeSpan = document.getElementById('referralAttrCode');
+        if (banner && codeSpan) {
+          codeSpan.textContent = activeRefCode;
+          banner.style.display = 'inline-block';
+        }
+        document.querySelectorAll('a[href="/install"], a[href="/?app=1"]').forEach(function (link) {
+          var href = link.getAttribute('href') || '';
+          if (href.indexOf('ref=') === -1) {
+            link.setAttribute(
+              'href',
+              href + (href.indexOf('?') === -1 ? '?' : '&') + 'ref=' + encodeURIComponent(activeRefCode)
+            );
+          }
+        });
+      }
+
       // FAQ Accordion
       var faqItems = document.querySelectorAll('#faqList .faq-item');
       faqItems.forEach(function (item) {
@@ -815,9 +852,10 @@
           e.preventDefault();
           var agency = (document.getElementById('demoAgency').value || '').trim();
           var contact = (document.getElementById('demoEmail').value || '').trim();
+          var refLine = activeRefCode ? ('\nPreporuka (Referral kod): ' + activeRefCode) : '';
           var subject = encodeURIComponent('ShiftPulse Ledger — Zakazivanje 15-min prikaza (' + agency + ')');
-          var body = encodeURIComponent('Poštovani,\n\nŽelimo 15-minutni prikaz uživo za agenciju: ' + agency + '\nKontakt: ' + contact + '\n\nHvala!');
-          window.location.href = 'mailto:kontakt@veles-lab.com?subject=' + subject + '&body=' + body;
+          var body = encodeURIComponent('Poštovani,\n\nŽelimo 15-minutni prikaz uživo za agenciju: ' + agency + '\nKontakt: ' + contact + refLine + '\n\nHvala!');
+          window.location.href = 'mailto:info@veles-lab.com?subject=' + subject + '&body=' + body;
           demoStatus.style.display = 'block';
         });
       }
